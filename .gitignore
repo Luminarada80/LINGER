@@ -1,4 +1,4 @@
-.txt
-.gexf
-.csv
-.tsv
+*.txt
+*.gexf
+*.csv
+*.tsv
