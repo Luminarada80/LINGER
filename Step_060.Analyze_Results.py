@@ -21,7 +21,6 @@ TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans
 CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_Linger_Ground_Truth.tsv'
 
 RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER'
-AUC_AUPR_OUTPUT_DIR: str = f'{RESULT_DIR}/AUC_AUPR'
 
 def load_data():
     """Load transcription factor (TF), cis-regulatory, and trans-regulatory network data."""
@@ -237,114 +236,85 @@ def summarize_ground_truth_and_trans_reg(ground_truth_df: pd.DataFrame, trans_re
 
 
 def main():
-    """Main function to run the analysis of the LINGER output"""
+    # """Main function to run the analysis of the LINGER output"""
 
-    # ----- DATA LOADING -----
-    tf_re_binding, cis_reg_network, trans_reg_network = load_data()
-    ground_truth = load_ground_truth()
+    # # ----- DATA LOADING -----
+    # tf_re_binding, cis_reg_network, trans_reg_network = load_data()
+    # ground_truth = load_ground_truth()
 
-    # ----- GENERAL INFORMATION -----
-    logging.info(f'\n----- TF-RE Binding Potential -----')
-    logging.info(f'REs (rows): {tf_re_binding.shape[0]}')
-    logging.info(f'TFs (columns): {tf_re_binding.shape[1]}')
-    logging.info(tf_re_binding.head())
+    # # ----- GENERAL INFORMATION -----
+    # logging.info(f'\n----- TF-RE Binding Potential -----')
+    # logging.info(f'REs (rows): {tf_re_binding.shape[0]}')
+    # logging.info(f'TFs (columns): {tf_re_binding.shape[1]}')
+    # logging.info(tf_re_binding.head())
 
-    logging.info(f'\n----- Cis-Regulatory Network -----')
-    logging.info(f'Network size: {cis_reg_network.shape[0]}')
-    logging.info(cis_reg_network.head())
+    # logging.info(f'\n----- Cis-Regulatory Network -----')
+    # logging.info(f'Network size: {cis_reg_network.shape[0]}')
+    # logging.info(cis_reg_network.head())
 
-    logging.info(f'\n----- Trans-Regulatory Network -----')
-    logging.info(f'Number of TFs (columns): {trans_reg_network.shape[1]}')
-    logging.info(f'Number of TGs (rows): {trans_reg_network.shape[0]}')
-    logging.info(trans_reg_network.head())
+    # logging.info(f'\n----- Trans-Regulatory Network -----')
+    # logging.info(f'Number of TFs (columns): {trans_reg_network.shape[1]}')
+    # logging.info(f'Number of TGs (rows): {trans_reg_network.shape[0]}')
+    # logging.info(trans_reg_network.head())
 
-    # Process the TF-TG pairs and retrieve scores from the trans-regulatory network
-    tf_list, tg_list, value_list, num_nan = process_tf_tg_pairs(ground_truth, trans_reg_network)
+    # # Process the TF-TG pairs and retrieve scores from the trans-regulatory network
+    # tf_list, tg_list, value_list, num_nan = process_tf_tg_pairs(ground_truth, trans_reg_network)
 
-    # Save the processed ground truth scores
-    ground_truth_df = save_ground_truth_scores(tf_list, tg_list, value_list)
+    # # Save the processed ground truth scores
+    # ground_truth_df = save_ground_truth_scores(tf_list, tg_list, value_list)
 
-    logging.info(f'\n----- Ground Truth Network -----')
-    logging.info(f'Number of TF-TG pairs: {ground_truth.shape[0]}')
-    logging.info(ground_truth.head())
+    # logging.info(f'\n----- Ground Truth Network -----')
+    # logging.info(f'Number of TF-TG pairs: {ground_truth.shape[0]}')
+    # logging.info(ground_truth.head())
 
-    logging.info(f'\nGround truth scores')
-    logging.info(ground_truth_df.head())
+    # logging.info(f'\nGround truth scores')
+    # logging.info(ground_truth_df.head())
 
-    logging.info(f'\n----- Summary Statistics -----')
-    # Generating summary statistics for the Score column
-    summarize_ground_truth_and_trans_reg(ground_truth_df, trans_reg_network, decimal_places=2)
+    # logging.info(f'\n----- Summary Statistics -----')
+    # # Generating summary statistics for the Score column
+    # summarize_ground_truth_and_trans_reg(ground_truth_df, trans_reg_network, decimal_places=2)
 
-    # Calculate metrics to see how many of the ground truth TFs, TGs, and pairs are in the full 
-    # trans-regulatory potential dataset
-    num_rows = ground_truth.shape[0]
+    # # Calculate metrics to see how many of the ground truth TFs, TGs, and pairs are in the full 
+    # # trans-regulatory potential dataset
+    # num_rows = ground_truth.shape[0]
     
-    num_tf_ground_truth = len(set(ground_truth_df["TF"]))
-    num_tf_trans_net = len(set(tf_list))
+    # num_tf_ground_truth = len(set(ground_truth_df["TF"]))
+    # num_tf_trans_net = len(set(tf_list))
 
-    num_tg_ground_truth = len(set(ground_truth_df['TG']))
-    tg_overlap = len([tg for tg in set(ground_truth_df["TG"]) if tg not in tf_list])
+    # num_tg_ground_truth = len(set(ground_truth_df['TG']))
+    # tg_overlap = len([tg for tg in set(ground_truth_df["TG"]) if tg not in tf_list])
 
-    logging.info(f'\n{num_tf_trans_net}/{num_tf_ground_truth} of ground truth TFs are represented in the trans-regulatory network')
-    logging.info(f'{tg_overlap}/{num_tg_ground_truth} of ground truth TGs are represented in the trans-regulatory network')
+    # logging.info(f'\n{num_tf_trans_net}/{num_tf_ground_truth} of ground truth TFs are represented in the trans-regulatory network')
+    # logging.info(f'{tg_overlap}/{num_tg_ground_truth} of ground truth TGs are represented in the trans-regulatory network')
 
-    logging.info(f'{num_nan} / {num_rows} ({round(num_nan/num_rows*100,2)}%) of TF to TG pairs did not have a score in the LINGER dataset')
+    # logging.info(f'{num_nan} / {num_rows} ({round(num_nan/num_rows*100,2)}%) of TF to TG pairs did not have a score in the LINGER dataset')
 
-    # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
-    missing_tfs = [tf for tf in set(ground_truth_df["TF"]) if tf not in tf_list]
+    # # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
+    # missing_tfs = [tf for tf in set(ground_truth_df["TF"]) if tf not in tf_list]
 
-    if len(missing_tfs) > 0:
-        logging.info(f'TFs present in ground truth missing in the trans-regulatory network')
-        for i in missing_tfs:
-            logging.info(i)
-
-
-    # ----- FIGURES -----
-    # Histogram distribution of trans-regulatory potential scores and ground truth scores
-    plot_trans_reg_distribution(trans_reg_network, ground_truth_df)
-
-    # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
-    plot_box_whisker(trans_reg_network, ground_truth_df)
-
-    # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
-    plot_violin(trans_reg_network, ground_truth_df)
-
-    # Violin plot with outliers removed
-    plot_violin_without_outliers(trans_reg_network, ground_truth_df)
+    # if len(missing_tfs) > 0:
+    #     logging.info(f'TFs present in ground truth missing in the trans-regulatory network')
+    #     for i in missing_tfs:
+    #         logging.info(i)
 
 
-    # ----- NETWORKX NETWORK -----
-    # Create and save the network graph
-    create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
+    # # ----- FIGURES -----
+    # # Histogram distribution of trans-regulatory potential scores and ground truth scores
+    # plot_trans_reg_distribution(trans_reg_network, ground_truth_df)
+
+    # # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
+    # plot_box_whisker(trans_reg_network, ground_truth_df)
+
+    # # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
+    # plot_violin(trans_reg_network, ground_truth_df)
+
+    # # Violin plot with outliers removed
+    # plot_violin_without_outliers(trans_reg_network, ground_truth_df)
 
 
-    # ----- AUC AND AUPR -----
-    # Make the AUC AUPR output directory if it does not exist
-    os.makedirs(f'{AUC_AUPR_OUTPUT_DIR}/', exist_ok=True)
-
-    # Reset the auc and aupr files
-    with open(f'{AUC_AUPR_OUTPUT_DIR}/auc_scores.txt', 'w') as auc_file, open(f'{AUC_AUPR_OUTPUT_DIR}/aupr_scores.txt', 'w') as aupr_file:
-        pass
-    
-    # Calculate the AUC and AUPR using LINGER Benchmk
-    logging.info(f'\n----- AUC and AUPR -----')
-    for idx, tf in enumerate(set(ground_truth_df["TF"])):
-        logging.info(f'\t{tf} ({idx+1}/{len(set(ground_truth_df["TF"]))})')
-        tf_name = tf
-        cell_types=['H1']
-        predicted_interactions=[TRANS_REG_NETWORK_PATH]
-        ground_truth_file='46177_gene_score_5fold.txt'
-        output_dir=f'{AUC_AUPR_OUTPUT_DIR}/'
-        data_type='matrix'
-        Benchmk.evaluate_transcription_predictions(
-            tf_name,
-            cell_types,
-            ground_truth_file, 
-            predicted_interactions, 
-            output_dir, 
-            data_type
-            )
-
+    # # ----- NETWORKX NETWORK -----
+    # # Create and save the network graph
+    # create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
 
 if __name__ == '__main__':
     main()

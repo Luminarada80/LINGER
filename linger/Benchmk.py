@@ -65,7 +65,7 @@ def plot_roc_curve(tf_name: str, cell_types: list[str], predicted_interactions: 
         false_positive_rate, true_positive_rate, thresholds = roc_curve(binary_true_positives, predicted_scores)
         auc_score: float = roc_auc_score(binary_true_positives, predicted_scores)
 
-        with open(f'{output_dir}/auc_scores.txt', 'a') as auc_file:
+        with open(f'{output_dir}auc_scores.txt', 'a') as auc_file:
             auc_file.write(f'{tf_name}\t{round(auc_score, 2)}\n')
 
         # Plot the ROC curve
