@@ -1,5 +1,9 @@
+import pandas as pd
 import logging
 import os   
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from linger import Benchmk
 import shared_variables
 
@@ -48,12 +52,13 @@ for file in os.listdir(shared_variables.ground_truth_dir):
 
 # Calculate the AUC and AUPR using LINGER Benchmk
 logging.info(f'\n----- AUC and AUPR -----')
+count = 0
 for idx, tf in enumerate(tf_list):
     tf_ground_truth_files = [file for file in ground_truth_filenames if tf in file ]
     for file in tf_ground_truth_files:
         cistrome_db = int(file.split('_')[-2].split('/')[-1])
         cell_type = cell_type_dict[cistrome_db]
-        logging.info(f'\t{tf} ({idx+1}/{len(set(tf_list))})')
+        logging.info(f'\t{tf} ({count+1}/{len(set(ground_truth_filenames))})')
         tf_name = tf
         cell_types=[cell_type]
         predicted_interactions=[f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{cell_type}.txt']
@@ -68,3 +73,28 @@ for idx, tf in enumerate(tf_list):
             output_dir, 
             data_type
             )
+        count += 1
+        
+file_path = f'{AUC_AUPR_OUTPUT_DIR}/auc_scores.txt'
+auc_scores = []
+
+# Open the file and read the AUC scores
+with open(file_path, 'r') as auc_file:
+    for line in auc_file:
+        tf_name, auc_score = line.strip().split('\t')
+        auc_scores.append(float(auc_score))
+
+auc_df = pd.DataFrame(auc_scores)
+
+# Create a violin plot that aggregates all TF scores into a single distribution
+plt.figure(figsize=(6, 6))
+sns.violinplot(data=auc_df, inner='quartile')
+
+# Set plot labels and title
+plt.ylabel('Score')
+plt.xlabel('LINGER')
+plt.title('PBMC AUC scores using CistromeDB ground truth')
+
+# Show the plot
+plt.tight_layout()
+plt.savefig(f'{AUC_AUPR_OUTPUT_DIR}/Auc_Violin_Plot.png', dpi=300)
