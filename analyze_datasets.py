@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_Linger_Ground_Truth.tsv'
-OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/ground_truth_w_score.csv'
+OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
@@ -72,13 +72,13 @@ fig, ax = plt.subplots(figsize=(7,4))
 # Plot a bar graph of the sorted gene expression percentages
 ax.bar(gene_expr_df_sorted['gene'], gene_expr_df_sorted['percent_expression'])
 
-ax.set_title('Percent of H1 cells expressing each ground truth TF', size=MEDIUM_SIZE)
+ax.set_title('Percent of PBMC cells expressing each ground truth TF', size=MEDIUM_SIZE)
 ax.set_ylabel('Percent gene expression', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/H1_Percent_Cells_Expressing_TF_Barplot.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_TF_Barplot.png', dpi=300)
 plt.close()
 
 
@@ -109,7 +109,7 @@ ax.bar(tf_trans_reg_stats_sorted['TF'],
        capsize=5)
 
 # Set plot title and labels
-ax.set_title('Average trans-regulatory potential score for each TF in H1 cells', size=MEDIUM_SIZE)
+ax.set_title('Average trans-regulatory potential score for each TF in PBMC cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Log10 Trans-regulatory potential score', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
@@ -150,7 +150,7 @@ ax.bar(index + bar_width/2,
        color='orange')
 
 # Set plot title and labels
-ax.set_title('Percent Expression and Log10 Trans-regulatory Scores for TFs in H1 Cells', size=MEDIUM_SIZE)
+ax.set_title('Percent Expression and Log10 Trans-regulatory Scores for TFs in PBMC Cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Percent Expression / Log10(Trans-reg Score)', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
@@ -180,7 +180,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 sns.violinplot(x='TF', y='log2_Score', data=filtered_df, ax=ax, scale='width', inner='quartile')
 
 # Set plot title and labels
-ax.set_title('Log2 Trans-regulatory potential scores for each TF in H1 cells', size=MEDIUM_SIZE)
+ax.set_title('Log2 Trans-regulatory potential scores for each TF in PBMC cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Log2 Trans-regulatory potential score', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
