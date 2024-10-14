@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/ground_truth_w_score.csv'
+CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
 OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
 
 SMALL_SIZE = 8
@@ -23,10 +23,19 @@ plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 adata_rna = sc.read_h5ad(ADATA_RNA_PATH)
-ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
+ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=',', header=0)
 
-ground_truth_tfs = list(set(ground_truth[0]))
-ground_truth_tgs = list(set(ground_truth[1]))
+print(adata_rna)
+
+num_cells = adata_rna.shape[0]
+num_genes = adata_rna.shape[1]
+
+print(f'Number of cells: {num_cells}')
+print(f'Number of genes: {num_genes}')
+print(adata_rna.obs['n_genes'])
+
+ground_truth_tfs = list(set(ground_truth['TF']))
+ground_truth_tgs = list(set(ground_truth['TG']))
 
 # Iterate through the shared genes between the ground truth and the scRNAseq data
 gene_expr_dict = {'gene': [], 'percent_expression': []}
@@ -105,7 +114,7 @@ fig, ax = plt.subplots(figsize=(7,4))
 # Plot a bar graph with error bars for the standard deviation
 ax.bar(tf_trans_reg_stats_sorted['TF'],
        np.log10(tf_trans_reg_stats_sorted['mean']),
-       yerr=np.log10(tf_trans_reg_stats_sorted['std']),
+       yerr=np.log10(tf_trans_reg_stats_sorted['std'],
        capsize=5)
 
 # Set plot title and labels
