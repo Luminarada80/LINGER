@@ -32,11 +32,15 @@ num_genes = adata_rna.shape[1]
 
 print(f'Total dataset size: {num_cells} cells x {num_genes} genes')
 
+print(f'\nAverage gene expression: {round(np.average(adata_rna.obs["n_genes"]/num_genes)*100,2)}% ({round(np.average(adata_rna.obs["n_genes"]))})')
+print(f'Std dev gene expression: {round(np.std(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.std(adata_rna.obs["n_genes"]))})')
+print(f'Min gene expression: {round(np.min(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.min(adata_rna.obs["n_genes"]))})')
+print(f'Max gene expression: {round(np.max(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.max(adata_rna.obs["n_genes"]))})')
+
 # Filter for cells expressing > 1000 genes
 cells_high_expression = adata_rna[adata_rna.obs['n_genes'] > 1000]
 print(f'{cells_high_expression.shape[0]} cells expressing >1000 genes')
 
-print(f'Avg. num genes expressed: {np.mean(adata_rna.obs["n_genes"])}')
 plt.hist(adata_rna.obs["n_genes"])
 plt.title('Number of genes expressed in PBMCs')
 plt.xlabel(f'Number of genes expressed ({num_genes} total genes)')
