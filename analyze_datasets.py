@@ -8,7 +8,7 @@ import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
 CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_Linger_Ground_Truth.tsv'
-OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER'
+OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_RESULTS'
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
@@ -39,10 +39,10 @@ num_h1_cells = h1_cells.shape[0]
 num_genes = h1_cells.shape[1]
 print(f'{num_h1_cells} H1 cells in the dataset')
 
-print(f'\nAverage gene expression: {round((np.average(h1_cells.obs["n_genes"])/num_genes)*100,2)}%')
-print(f'Std dev gene expression: {round(np.std(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
-print(f'Min gene expression: {round(np.min(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
-print(f'Max gene expression: {round(np.max(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
+print(f'\nAverage gene expression: {round(np.average(h1_cells.obs["n_genes"]/num_genes)*100,2)}% ({round(np.average(h1_cells.obs["n_genes"]))})')
+print(f'Std dev gene expression: {round(np.std(h1_cells.obs["n_genes"])/num_genes*100,2)}% ({round(np.std(h1_cells.obs["n_genes"]))})')
+print(f'Min gene expression: {round(np.min(h1_cells.obs["n_genes"])/num_genes*100,2)}% ({round(np.min(h1_cells.obs["n_genes"]))})')
+print(f'Max gene expression: {round(np.max(h1_cells.obs["n_genes"])/num_genes*100,2)}% ({round(np.max(h1_cells.obs["n_genes"]))})')
 
 # Filter for cells expressing > 1000 genes
 h1_cells_high_expression = h1_cells[h1_cells.obs['n_genes'] > 1000]
@@ -52,7 +52,7 @@ plt.hist(h1_cells.obs["n_genes"])
 plt.title('H1 cells number of genes expressed')
 plt.xlabel(f'Number of genes expressed ({h1_cells.shape[1]} total genes)')
 plt.ylabel(f'Number of cells ({h1_cells.shape[0]} total cells)')
-plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/avg_gene_expr_hist.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/avg_gene_expr_hist.png', dpi=300)
 plt.close()
 
 # Iterate through the shared genes between the ground truth and the scRNAseq data
@@ -94,6 +94,7 @@ fig, ax = plt.subplots(figsize=(7,4))
 ax.bar(gene_expr_df_sorted['gene'], gene_expr_df_sorted['percent_expression'])
 
 ax.set_title('Percent of H1 cells expressing each ground truth TF', size=MEDIUM_SIZE)
+ax.set_ylim(bottom=0, top=100)
 ax.set_ylabel('Percent gene expression', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
@@ -104,7 +105,7 @@ plt.close()
 
 
 # Load the ground truth with trans-regulatory potential scores dataset
-ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/H1_RESULTS/ground_truth_w_score.csv', header=0, sep=',')
+ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/ground_truth_w_score.csv', header=0, sep=',')
 print(ground_truth_trans_reg.head())
 
 # Filter for transcription factors that are in ground_truth_tfs
@@ -136,7 +137,7 @@ ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/TF_Average_H1_Trans_Reg_Potential_Barplot_with_Errorbars.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/TF_Average_H1_Trans_Reg_Potential_Barplot_with_Errorbars.png', dpi=300)
 plt.close()
 
 
@@ -184,7 +185,7 @@ ax.legend()
 
 # Adjust layout and save the figure
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/Overlapping_Barplot_TF_Percent_Trans_Reg_Scores.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/Overlapping_Barplot_TF_Percent_Trans_Reg_Scores.png', dpi=300)
 plt.close()
 
 # ------ VIOLIN PLOT ------
@@ -210,5 +211,5 @@ ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 # Adjust layout and save the figure
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/TF_Log2_Trans_Reg_Potential_Violin_Plot.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/TF_Log2_Trans_Reg_Potential_Violin_Plot.png', dpi=300)
 plt.close()
