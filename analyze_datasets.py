@@ -30,9 +30,19 @@ print(adata_rna)
 num_cells = adata_rna.shape[0]
 num_genes = adata_rna.shape[1]
 
-print(f'Number of cells: {num_cells}')
-print(f'Number of genes: {num_genes}')
-print(adata_rna.obs['n_genes'])
+print(f'Total dataset size: {num_cells} cells x {num_genes} genes')
+
+# Filter for cells expressing > 1000 genes
+cells_high_expression = adata_rna[adata_rna.obs['n_genes'] > 1000]
+print(f'{cells_high_expression.shape[0]} cells expressing >1000 genes')
+
+print(f'Avg. num genes expressed: {np.mean(adata_rna.obs["n_genes"])}')
+plt.hist(adata_rna.obs["n_genes"])
+plt.title('Number of genes expressed in PBMCs')
+plt.xlabel(f'Number of genes expressed ({num_genes} total genes)')
+plt.ylabel(f'Number of cells ({num_cells} total cells)')
+plt.savefig(f'{OUTPUT_DIR}/avg_gene_expr_hist.png', dpi=300)
+plt.close()
 
 ground_truth_tfs = list(set(ground_truth['TF']))
 ground_truth_tgs = list(set(ground_truth['TG']))
@@ -45,14 +55,11 @@ for gene in ground_truth_tfs:
     # Find the index of the gene name in the AnnData object
     gene_idx = adata_rna.var_names.get_loc(gene)
 
-    # Isolate the cell expresion data for H1 cells based on their label being 0
-    h1_cells = [i for idx, i in enumerate(adata_rna[:, gene_idx].X) if adata_rna.obs['label'][idx] == 0]
+    # Isolate the cell expresion data
+    cell_exprssion = [i for i in adata_rna[:, gene_idx].X]
     
     # Sum the number of H1 cells expressing the gene
-    num_cells_expressing_gene = np.sum([1 if i > 0 else 0 for i in h1_cells])
-
-    # Total number of H1 cells
-    num_cells = len(h1_cells)
+    num_cells_expressing_gene = np.sum([1 if i > 0 else 0 for i in cell_exprssion])
 
     # Calculate the percentage of total cells expressing the gene
     percent_expression = round((num_cells_expressing_gene/num_cells)*100,2)
@@ -68,12 +75,12 @@ gene_expr_df = pd.DataFrame(gene_expr_dict)
 gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascending=False)
 
 # Write the gene expression dataframe to a tsv file
-gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/H1_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
+gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
 
-print(f'\nAverage gene expression: {round(np.average(gene_expr_df["percent_expression"]),2)}')
-print(f'Std dev gene expression: {round(np.std(gene_expr_df["percent_expression"]),2)}')
-print(f'Min gene expression: {round(np.min(gene_expr_df["percent_expression"]),2)}')
-print(f'Max gene expression: {round(np.max(gene_expr_df["percent_expression"]),2)}')
+print(f'\nAverage gene expression: {round(np.average(gene_expr_df["percent_expression"]),2)}%')
+print(f'Std dev gene expression: {round(np.std(gene_expr_df["percent_expression"]),2)}%')
+print(f'Min gene expression: {round(np.min(gene_expr_df["percent_expression"]),2)}%')
+print(f'Max gene expression: {round(np.max(gene_expr_df["percent_expression"]),2)}%')
 
 # Create the plot
 fig, ax = plt.subplots(figsize=(7,4))
@@ -114,7 +121,7 @@ fig, ax = plt.subplots(figsize=(7,4))
 # Plot a bar graph with error bars for the standard deviation
 ax.bar(tf_trans_reg_stats_sorted['TF'],
        np.log10(tf_trans_reg_stats_sorted['mean']),
-       yerr=np.log10(tf_trans_reg_stats_sorted['std'],
+       yerr=tf_trans_reg_stats_sorted['std'],
        capsize=5)
 
 # Set plot title and labels
