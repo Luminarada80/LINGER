@@ -28,25 +28,41 @@ ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
 ground_truth_tfs = list(set(ground_truth[0]))
 ground_truth_tgs = list(set(ground_truth[1]))
 
+# Isolate just the H1 cells
+print(adata_rna)
+
+print(f'Total dataset size: {adata_rna.shape[0]} cells x {adata_rna.shape[1]} genes')
+h1_cells = adata_rna[adata_rna.obs['label'] == 0]
+
+# Print the number of H1 cells
+num_h1_cells = h1_cells.shape[0]
+print(f'{num_h1_cells} H1 cells in the dataset')
+
+# Filter for cells expressing > 1000 genes
+h1_cells_high_expression = h1_cells[h1_cells.obs['n_genes'] > 1000]
+print(f'{h1_cells_high_expression.shape[0]} H1 cells expressing >1000 genes')
+
+print(f'Avg. num genes expressed: {np.mean(h1_cells.obs["n_genes"])}')
+plt.hist(h1_cells.obs["n_genes"])
+plt.title('H1 cells number of genes expressed (before filtering)')
+plt.xlabel(f'Number of genes expressed ({h1_cells.shape[1]} total genes)')
+plt.ylabel(f'Number of cells ({h1_cells.shape[0]} total cells)')
+plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/avg_gene_expr_hist.png', dpi=300)
+plt.close()
+
 # Iterate through the shared genes between the ground truth and the scRNAseq data
 gene_expr_dict = {'gene': [], 'percent_expression': []}
 for gene in ground_truth_tfs:
-  if gene in adata_rna.var['gene_ids']:
+  if gene in h1_cells.var['gene_ids']:
 
     # Find the index of the gene name in the AnnData object
     gene_idx = adata_rna.var_names.get_loc(gene)
-
-    # Isolate the cell expresion data for H1 cells based on their label being 0
-    h1_cells = [i for idx, i in enumerate(adata_rna[:, gene_idx].X) if adata_rna.obs['label'][idx] == 0]
     
     # Sum the number of H1 cells expressing the gene
-    num_cells_expressing_gene = np.sum([1 if i > 0 else 0 for i in h1_cells])
-
-    # Total number of H1 cells
-    num_cells = len(h1_cells)
+    num_cells_expressing_gene = np.sum([1 if i > 0 else 0 for i in h1_cells[:, gene_idx].X])
 
     # Calculate the percentage of total cells expressing the gene
-    percent_expression = round((num_cells_expressing_gene/num_cells)*100,2)
+    percent_expression = round((num_cells_expressing_gene/num_h1_cells)*100,2)
 
     # Append the gene and percent expression to dictionaries
     gene_expr_dict['gene'].append(gene)
@@ -83,7 +99,7 @@ plt.close()
 
 
 # Load the ground truth with trans-regulatory potential scores dataset
-ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/ground_truth_w_score.csv', header=0, sep=',')
+ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/H1_RESULTS/ground_truth_w_score.csv', header=0, sep=',')
 print(ground_truth_trans_reg.head())
 
 # Filter for transcription factors that are in ground_truth_tfs
@@ -115,7 +131,7 @@ ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/TF_Average_H1_Trans_Reg_Potential_Barplot_with_Errorbars.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/TF_Average_H1_Trans_Reg_Potential_Barplot_with_Errorbars.png', dpi=300)
 plt.close()
 
 
@@ -163,7 +179,7 @@ ax.legend()
 
 # Adjust layout and save the figure
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/Overlapping_Barplot_TF_Percent_Trans_Reg_Scores.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/Overlapping_Barplot_TF_Percent_Trans_Reg_Scores.png', dpi=300)
 plt.close()
 
 # ------ VIOLIN PLOT ------
@@ -189,5 +205,5 @@ ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 # Adjust layout and save the figure
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/TF_Log2_Trans_Reg_Potential_Violin_Plot.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/TF_Log2_Trans_Reg_Potential_Violin_Plot.png', dpi=300)
 plt.close()

@@ -42,6 +42,7 @@ adata_RNA, adata_ATAC = get_adata(matrix, features, barcodes, label)  # adata_RN
 
 print(f'\tscRNAseq Dataset: {adata_RNA.shape[0]} genes, {adata_RNA.shape[1]} cells')
 print(f'\tscATACseq Dataset: {adata_ATAC.shape[0]} peaks, {adata_ATAC.shape[1]} cells')
+print(adata_RNA)
 
 # Remove low counts cells and genes
 print('\nFiltering Data')
