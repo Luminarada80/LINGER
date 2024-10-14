@@ -36,15 +36,20 @@ h1_cells = adata_rna[adata_rna.obs['label'] == 0]
 
 # Print the number of H1 cells
 num_h1_cells = h1_cells.shape[0]
+num_genes = h1_cells.shape[1]
 print(f'{num_h1_cells} H1 cells in the dataset')
+
+print(f'\nAverage gene expression: {round((np.average(h1_cells.obs["n_genes"])/num_genes)*100,2)}%')
+print(f'Std dev gene expression: {round(np.std(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
+print(f'Min gene expression: {round(np.min(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
+print(f'Max gene expression: {round(np.max(h1_cells.obs["n_genes"])/num_genes*100,2)}%')
 
 # Filter for cells expressing > 1000 genes
 h1_cells_high_expression = h1_cells[h1_cells.obs['n_genes'] > 1000]
-print(f'{h1_cells_high_expression.shape[0]} H1 cells expressing >1000 genes')
+print(f'\n{h1_cells_high_expression.shape[0]} H1 cells expressing >1000 genes')
 
-print(f'Avg. num genes expressed: {np.mean(h1_cells.obs["n_genes"])}')
 plt.hist(h1_cells.obs["n_genes"])
-plt.title('H1 cells number of genes expressed (before filtering)')
+plt.title('H1 cells number of genes expressed')
 plt.xlabel(f'Number of genes expressed ({h1_cells.shape[1]} total genes)')
 plt.ylabel(f'Number of cells ({h1_cells.shape[0]} total cells)')
 plt.savefig(f'{OUTPUT_DIR}/H1_RESULTS/avg_gene_expr_hist.png', dpi=300)
@@ -77,10 +82,10 @@ gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascendin
 # Write the gene expression dataframe to a tsv file
 gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/H1_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
 
-print(f'\nAverage gene expression: {round(np.average(gene_expr_df["percent_expression"]),2)}')
-print(f'Std dev gene expression: {round(np.std(gene_expr_df["percent_expression"]),2)}')
-print(f'Min gene expression: {round(np.min(gene_expr_df["percent_expression"]),2)}')
-print(f'Max gene expression: {round(np.max(gene_expr_df["percent_expression"]),2)}')
+print(f'\nAverage TF expression: {round(np.average(gene_expr_df["percent_expression"]),2)}%')
+print(f'Std dev TF expression: {round(np.std(gene_expr_df["percent_expression"]),2)}%')
+print(f'Min TF expression: {round(np.min(gene_expr_df["percent_expression"]),2)}%')
+print(f'Max TF expression: {round(np.max(gene_expr_df["percent_expression"]),2)}%')
 
 # Create the plot
 fig, ax = plt.subplots(figsize=(7,4))
