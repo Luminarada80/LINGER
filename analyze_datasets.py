@@ -121,9 +121,10 @@ def find_tf_expression(ground_truth, cell_type):
             gene_expr_dict['gene'].append(gene)
             gene_expr_dict['percent_expression'].append(percent_expression)
 
-    # Convert the gene expression dictionary to a DataFrame
-    gene_expr_df = pd.DataFrame(gene_expr_dict)
-    return gene_expr_df, ground_truth_tfs
+    # Convert the gene expression dictionaries to a DataFrame
+    percent_tf_expr_df = pd.DataFrame(gene_expr_dict)
+
+    return percent_tf_expr_df, ground_truth_tfs
 
 def plot_gene_expression_violinplot(adata_rna, cell_type_list):
     # Initialize a list to hold the data for each cell type
@@ -163,16 +164,16 @@ def plot_gene_expression_violinplot(adata_rna, cell_type_list):
     plt.savefig(f'{OUTPUT_DIR}/gene_expression_violinplot_percentage_sorted.png', dpi=300)
     plt.close()
 
-def plot_tf_expression(gene_expr_df_sorted, cell_type):
+def plot_tf_expression_barplot_by_celltype(percent_tf_expr_df_sorted, cell_type):
     fig, ax = plt.subplots(figsize=(7, 4))
 
     # Plot a bar graph of the sorted gene expression percentages
-    ax.bar(gene_expr_df_sorted['gene'], gene_expr_df_sorted['percent_expression'])
+    ax.bar(percent_tf_expr_df_sorted['gene'], percent_tf_expr_df_sorted['percent_expression'])
 
     # Set the title, labels, and limits
     ax.set_title(f'Percent of {cell_type} expressing each ground truth TF', size=MEDIUM_SIZE)
     ax.set_ylim(bottom=0, top=100)
-    ax.set_ylabel('Percent gene expression', size=MEDIUM_SIZE)
+    ax.set_ylabel('Percent of cells', size=MEDIUM_SIZE)
     ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
     # Add a dashed line at y=10
@@ -224,24 +225,34 @@ plot_gene_expression_violinplot(adata_rna, sorted_cell_type_set)
 
 
 for cell_type in sorted_cell_type_set:
-    # Get the cell expression 
-    gene_expr_df, ground_truth_tfs = find_tf_expression(ground_truth, cell_type)
+    # Sets the cell type to H1 in the H1 dataset
+    if cell_type == '0':
+        cell_type == 'H1'
 
-    # Sort the dataframe
-    gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascending=False)
+    # Get the cell expression 
+    percent_tf_expr_df, ground_truth_tfs = find_tf_expression(ground_truth, cell_type)
+
+    # Sort the dataframes
+    percent_tf_expr_df_sorted = percent_tf_expr_df.sort_values(by='percent_expression', ascending=False)
 
     # Write the gene expression dataframe to a tsv file
-    gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
+    percent_tf_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
+
+    with open(f'{OUTPUT_DIR}/{cell_type}/{cell_type}_Tf_Expression.txt', 'w') as outfile:
+        outfile.write(f'Cell_type\t{"_".join([i for i in cell_type.split(" ")])}\n')
+        outfile.write(f'Average_TF_expression\t{round(np.average(percent_tf_expr_df["percent_expression"]),2)}%\n')
+        outfile.write(f'Std_dev_TF_expression\t{round(np.std(percent_tf_expr_df["percent_expression"]),2)}%\n')
+        outfile.write(f'Min_TF_expression\t{round(np.min(percent_tf_expr_df["percent_expression"]),2)}%\n')
+        outfile.write(f'Max_TF_expression\t{round(np.max(percent_tf_expr_df["percent_expression"]),2)}%\n')
 
     print(f'\nTF Expression in {cell_type}')
-    print(f'\tAverage TF expression: {round(np.average(gene_expr_df["percent_expression"]),2)}%')
-    print(f'\tStd dev TF expression: {round(np.std(gene_expr_df["percent_expression"]),2)}%')
-    print(f'\tMin TF expression: {round(np.min(gene_expr_df["percent_expression"]),2)}%')
-    print(f'\tMax TF expression: {round(np.max(gene_expr_df["percent_expression"]),2)}%')
+    print(f'\tAverage TF expression: {round(np.average(percent_tf_expr_df["percent_expression"]),2)}%')
+    print(f'\tStd dev TF expression: {round(np.std(percent_tf_expr_df["percent_expression"]),2)}%')
+    print(f'\tMin TF expression: {round(np.min(percent_tf_expr_df["percent_expression"]),2)}%')
+    print(f'\tMax TF expression: {round(np.max(percent_tf_expr_df["percent_expression"]),2)}%')
 
-    plot_tf_expression(gene_expr_df_sorted, cell_type)
-
-
+    # Plot the expression of each TF for the cell type as a barplot
+    plot_tf_expression_barplot_by_celltype(percent_tf_expr_df_sorted, cell_type)
 
 # Load the ground truth with trans-regulatory potential scores dataset
 ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/ground_truth_w_score.csv', header=0, sep=',')
@@ -288,7 +299,7 @@ filtered_df['log10_Score'] = np.log10(filtered_df['Score'].replace(0, np.nan))
 tf_trans_reg_stats_log10 = filtered_df.groupby('TF')['log10_Score'].agg(['mean', 'std']).reset_index()
 
 # Merge the two datasets by 'TF' for overlapping barplots
-merged_df = pd.merge(gene_expr_df_sorted, tf_trans_reg_stats_log10, left_on='gene', right_on='TF')
+merged_df = pd.merge(percent_tf_expr_df_sorted, tf_trans_reg_stats_log10, left_on='gene', right_on='TF')
 
 # ------ OVERLAPPING BAR PLOTS WITH LOG10 ERROR BARS ------
 # Create the plot
