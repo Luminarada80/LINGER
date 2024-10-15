@@ -61,7 +61,7 @@ def cell_type_percentage_bar_plot(cell_type_percentage_list):
     plt.title('Percentage of Cell Types', fontsize=14)
     plt.xlabel('Cell Type', fontsize=12)
     plt.ylabel('Percentage (%)', fontsize=12)
-    plt.ylim(top=25)
+    plt.ylim(top=max(sorted_cell_type_percentage_list)+5)
 
     # Rotate x-axis labels for better readability
     plt.xticks(rotation=45, ha='right', fontsize=10)
