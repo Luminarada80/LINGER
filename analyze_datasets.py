@@ -77,14 +77,23 @@ def cell_type_percentage_bar_plot(cell_type_percentage_list):
     plt.close()
 
 def plot_cell_expression_histogram(dataset, cell_type):
-    plt.hist(dataset.obs["n_genes"])
-    plt.title(f'Number of genes expressed in {cell_type}s')
+    n_cells = dataset.shape[0]
+    
+    # Create the histogram and calculate bin heights
+    counts, bins, _ = plt.hist(dataset.obs["n_genes"], bins=30, edgecolor='black', weights=np.ones_like(dataset.obs["n_genes"]) / n_cells * 100)
+    
+    plt.title(f'Percentage of cells by number of genes expressed in {cell_type}s')
+    plt.ylim((0, 20))
+    plt.xlim((0, 5000))
     plt.xlabel(f'Number of genes expressed ({dataset.shape[1]} total genes)')
-    plt.ylabel(f'Number of cells ({dataset.shape[0]} total cells)')
+    max_percentage = 20
+    plt.yticks(np.arange(0, max_percentage + 1, 5), [f'{i}%' for i in range(0, max_percentage + 1, 5)])
+    plt.ylabel(f'Percentage of cells ({n_cells} total cells)')
+    
     plt.savefig(f'{OUTPUT_DIR}/avg_gene_expr_hist.png', dpi=300)
     plt.close()
 
-def find_tf_expression(ground_truth, dataset):
+def find_tf_expression(ground_truth):
     ground_truth_tfs = list(set(ground_truth['TF']))
 
     # Iterate through the shared genes between the ground truth and the scRNAseq data
@@ -109,7 +118,7 @@ def find_tf_expression(ground_truth, dataset):
 
     # Convert the gene expression dictionary to a DataFrame
     gene_expr_df = pd.DataFrame(gene_expr_dict)
-    return gene_expr_df
+    return gene_expr_df, ground_truth_tfs
    
 # Read in the AnnData files for the scRNAseq and ground truth datasets
 adata_rna, ground_truth = read_dataset(ground_truth_sep=',', ground_truth_header=0)
@@ -139,7 +148,7 @@ print(f'{cells_high_expression.shape[0]} cells expressing >1000 genes')
 plot_cell_expression_histogram(adata_rna, cell_type="PBMC")
 
 # Get the cell expression 
-gene_expr_df = find_tf_expression(ground_truth, adata_rna)
+gene_expr_df, ground_truth_tfs = find_tf_expression(ground_truth)
 
 # Sort the dataframe
 gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascending=False)
