@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
-CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
-OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
+CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_RESULTS/ground_truth_w_score.csv'
+OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_RESULTS'
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
@@ -145,7 +145,7 @@ cells_high_expression = adata_rna[adata_rna.obs['n_genes'] > 1000]
 print(f'{cells_high_expression.shape[0]} cells expressing >1000 genes')
 
 # Plot a histogram of the number of genes each cell is expressing
-plot_cell_expression_histogram(adata_rna, cell_type="PBMC")
+plot_cell_expression_histogram(adata_rna, cell_type="0")
 
 # Get the cell expression 
 gene_expr_df, ground_truth_tfs = find_tf_expression(ground_truth)
@@ -154,7 +154,7 @@ gene_expr_df, ground_truth_tfs = find_tf_expression(ground_truth)
 gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascending=False)
 
 # Write the gene expression dataframe to a tsv file
-gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
+gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/H1_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
 
 print(f'\nAverage gene expression: {round(np.average(gene_expr_df["percent_expression"]),2)}%')
 print(f'Std dev gene expression: {round(np.std(gene_expr_df["percent_expression"]),2)}%')
@@ -167,14 +167,14 @@ fig, ax = plt.subplots(figsize=(7,4))
 # Plot a bar graph of the sorted gene expression percentages
 ax.bar(gene_expr_df_sorted['gene'], gene_expr_df_sorted['percent_expression'])
 
-ax.set_title('Percent of PBMC cells expressing each ground truth TF', size=MEDIUM_SIZE)
+ax.set_title('Percent of H1 cells expressing each ground truth TF', size=MEDIUM_SIZE)
 ax.set_ylim(bottom=0, top=100)
 ax.set_ylabel('Percent gene expression', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
 
 plt.tight_layout()
-plt.savefig(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_TF_Barplot.png', dpi=300)
+plt.savefig(f'{OUTPUT_DIR}/H1_Percent_Cells_Expressing_TF_Barplot.png', dpi=300)
 plt.close()
 
 
@@ -205,7 +205,7 @@ ax.bar(tf_trans_reg_stats_sorted['TF'],
        capsize=5)
 
 # Set plot title and labels
-ax.set_title('Average trans-regulatory potential score for each TF in PBMC cells', size=MEDIUM_SIZE)
+ax.set_title('Average trans-regulatory potential score for each TF in H1 cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Log10 Trans-regulatory potential score', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 ax.tick_params(axis='x', labelsize=7, rotation=45)
@@ -246,7 +246,7 @@ ax.bar(index + bar_width/2,
        color='orange')
 
 # Set plot title and labels
-ax.set_title('Percent Expression and Log10 Trans-regulatory Scores for TFs in PBMC Cells', size=MEDIUM_SIZE)
+ax.set_title('Percent Expression and Log10 Trans-regulatory Scores for TFs in H1 Cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Percent Expression / Log10(Trans-reg Score)', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
@@ -276,7 +276,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 sns.violinplot(x='TF', y='log2_Score', data=filtered_df, ax=ax, scale='width', inner='quartile')
 
 # Set plot title and labels
-ax.set_title('Log2 Trans-regulatory potential scores for each TF in PBMC cells', size=MEDIUM_SIZE)
+ax.set_title('Log2 Trans-regulatory potential scores for each TF in H1 cells', size=MEDIUM_SIZE)
 ax.set_ylabel('Log2 Trans-regulatory potential score', size=MEDIUM_SIZE)
 ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
