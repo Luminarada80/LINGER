@@ -51,7 +51,7 @@ def cell_type_percentage_bar_plot(cell_type_percentage_list):
     # Sort the cell types and percentages together in reverse order
     sorted_indices = np.argsort(cell_type_percentage_list)[::-1]
     sorted_cell_type_percentage_list = [cell_type_percentage_list[i] for i in sorted_indices]
-    sorted_cell_type_set = [cell_type_list[i] for i in sorted_indices]
+    sorted_cell_type_set = [str(cell_type_list[i]) for i in sorted_indices]
 
     # Create a bar chart
     plt.figure(figsize=(10, 6))  # Set the figure size to ensure enough space for labels
@@ -61,7 +61,7 @@ def cell_type_percentage_bar_plot(cell_type_percentage_list):
     plt.title('Percentage of Cell Types', fontsize=14)
     plt.xlabel('Cell Type', fontsize=12)
     plt.ylabel('Percentage (%)', fontsize=12)
-    plt.ylim(top=25)
+    plt.ylim(top=max(sorted_cell_type_percentage_list)+5)
 
     # Rotate x-axis labels for better readability
     plt.xticks(rotation=45, ha='right', fontsize=10)
