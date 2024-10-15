@@ -1,191 +1,354 @@
-import os
 import scanpy as sc
 import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import os
 
 import shared_variables
 
-# Set shared file paths
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
 CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
 OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
 
-# Set plot parameters
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
 BIGGER_SIZE = 12
 
-plt.rc('font', size=SMALL_SIZE)
-plt.rc('axes', titlesize=MEDIUM_SIZE)
-plt.rc('axes', labelsize=MEDIUM_SIZE)
-plt.rc('xtick', labelsize=SMALL_SIZE)
-plt.rc('ytick', labelsize=SMALL_SIZE)
-plt.rc('legend', fontsize=SMALL_SIZE)
-plt.rc('figure', titlesize=BIGGER_SIZE)
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def load_data(adata_path, ground_truth_path):
-    """Load RNA data and ground truth data."""
-    adata_rna = sc.read_h5ad(adata_path)
-    ground_truth = pd.read_csv(ground_truth_path, sep=',', header=0)
+def read_dataset(ground_truth_sep: str, ground_truth_header):
+    adata_rna = sc.read_h5ad(ADATA_RNA_PATH)
+    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=ground_truth_sep, header=ground_truth_header)
+
+    print(adata_rna)
     return adata_rna, ground_truth
 
-
-def calculate_cell_type_percentages(adata_rna):
-    """Calculate the percentage of cells for each cell type."""
-    cell_type_list = list(set(adata_rna.obs['label']))
-    num_cells = adata_rna.shape[0]
-
+def find_cell_types(adata_rna):
+    cell_type_list = list(set([i for i in adata_rna.obs['label']]))
     cell_type_percentage_list = []
+
     for cell_type in cell_type_list:
-        cell_type_num_cells = adata_rna[adata_rna.obs['label'] == cell_type].shape[0]
-        percent_of_total = (cell_type_num_cells / num_cells) * 100
-        cell_type_percentage_list.append((cell_type, percent_of_total))
+        print(cell_type)
+        cell_type_dataset = adata_rna[adata_rna.obs['label'] == cell_type]
+        cell_type_num_cells = cell_type_dataset.shape[0]
+        percent_of_total = cell_type_num_cells/num_cells*100
 
-    # Sort by percentage in descending order
-    cell_type_percentage_list = sorted(cell_type_percentage_list, key=lambda x: x[1], reverse=True)
-    return cell_type_percentage_list
+        print(f'\tNumber of cells for {cell_type}: {cell_type_num_cells} ({round(percent_of_total)}%)')
 
+        cell_type_percentage_list.append(percent_of_total)
 
-def plot_bar_chart(data, title, xlabel, ylabel, output_path, ylim_top=None, rotation=45):
-    """Plot a bar chart for given data."""
-    labels, values = zip(*data)
-    plt.figure(figsize=(10, 6))
-    plt.bar(labels, values, color='skyblue')
+    return cell_type_list, cell_type_percentage_list
 
-    # Set title and labels
-    plt.title(title, fontsize=14)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    if ylim_top:
-        plt.ylim(top=ylim_top)
+def cell_type_percentage_bar_plot(cell_type_percentage_list):
+    # Sort the cell types and percentages together in reverse order
+    sorted_indices = np.argsort(cell_type_percentage_list)[::-1]
+    sorted_cell_type_percentage_list = [cell_type_percentage_list[i] for i in sorted_indices]
+    sorted_cell_type_set = [cell_type_list[i] for i in sorted_indices]
 
-    # Rotate x-axis labels
-    plt.xticks(rotation=rotation, ha='right', fontsize=10)
-
-    # Add value labels on top of each bar
-    for i, value in enumerate(values):
-        plt.text(i, value + 0.5, f'{value:.1f}%', ha='center', fontsize=10)
-
-    # Adjust layout and save the figure
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
-    plt.close()
-
-
-def plot_histogram(data, title, xlabel, ylabel, output_path):
-    """Plot a histogram."""
-    plt.figure(figsize=(10, 6))
-    plt.hist(data, bins=30, color='skyblue', edgecolor='black')
+    # Create a bar chart
+    plt.figure(figsize=(10, 6))  # Set the figure size to ensure enough space for labels
+    plt.bar(sorted_cell_type_set, sorted_cell_type_percentage_list, color='skyblue')
 
     # Set title and labels
-    plt.title(title, fontsize=14)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
+    plt.title('Percentage of Cell Types', fontsize=14)
+    plt.xlabel('Cell Type', fontsize=12)
+    plt.ylabel('Percentage (%)', fontsize=12)
+    plt.ylim(top=25)
 
-    # Adjust layout and save the figure
+    # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45, ha='right', fontsize=10)
+
+    # Add percentage labels on top of each bar
+    for i, percentage in enumerate(sorted_cell_type_percentage_list):
+        plt.text(i, percentage + 0.5, f'{percentage:.1f}%', ha='center', fontsize=10)
+
+    # Adjust layout to prevent overlap
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+
+    # Save the figure
+    plt.savefig(f'{OUTPUT_DIR}/cell_type_bar_chart.png', dpi=300)
     plt.close()
 
+    return sorted_cell_type_set
 
-def calculate_gene_expression_stats(adata_rna, ground_truth_tfs):
-    """Calculate percentage of cells expressing each transcription factor in the ground truth."""
-    num_cells = adata_rna.shape[0]
+def plot_cell_expression_histogram(dataset, cell_type):
+    n_cells = dataset.shape[0]
+    
+    # Create the histogram and calculate bin heights
+    counts, bins, _ = plt.hist(dataset.obs["n_genes"], bins=30, edgecolor='black', weights=np.ones_like(dataset.obs["n_genes"]) / n_cells * 100)
+    
+    plt.title(f'Percentage of cells by number of genes expressed in {cell_type}s')
+    plt.ylim((0, 20))
+    plt.xlim((0, 5000))
+    plt.xlabel(f'Number of genes expressed ({dataset.shape[1]} total genes)')
+    max_percentage = 20
+    plt.yticks(np.arange(0, max_percentage + 1, 5), [f'{i}%' for i in range(0, max_percentage + 1, 5)])
+    plt.ylabel(f'Percentage of cells ({n_cells} total cells)')
+    
+    plt.savefig(f'{OUTPUT_DIR}/avg_gene_expr_hist.png', dpi=300)
+    plt.close()
+
+def find_tf_expression(ground_truth, cell_type):
+    ground_truth_tfs = list(set(ground_truth['TF']))
+
+    # Iterate through the shared genes between the ground truth and the scRNAseq data
     gene_expr_dict = {'gene': [], 'percent_expression': []}
-
     for gene in ground_truth_tfs:
         if gene in adata_rna.var['gene_ids']:
-            # Find the index of the gene
+            # Find the index of the gene name in the AnnData object
             gene_idx = adata_rna.var_names.get_loc(gene)
 
-            # Calculate number of cells expressing the gene
-            cell_expression = adata_rna[:, gene_idx].X
-            num_cells_expressing_gene = np.sum(cell_expression > 0)
+            cell_type_data = adata_rna[adata_rna.obs['label'] == cell_type]
+
+            # Isolate the cell expresion data
+            cell_expression = [i for i in cell_type_data[:, gene_idx].X]
+
+            # Sum the number of cells expressing the gene
+            num_cells_expressing_gene = np.sum([1 if i > 0 else 0 for i in cell_expression])
 
             # Calculate the percentage of total cells expressing the gene
-            percent_expression = round((num_cells_expressing_gene / num_cells) * 100, 2)
+            percent_expression = round((num_cells_expressing_gene/len(cell_expression))*100,2)
+
+            # Append the gene and percent expression to dictionaries
             gene_expr_dict['gene'].append(gene)
             gene_expr_dict['percent_expression'].append(percent_expression)
 
-    # Convert to DataFrame and sort
+    # Convert the gene expression dictionary to a DataFrame
     gene_expr_df = pd.DataFrame(gene_expr_dict)
-    return gene_expr_df.sort_values(by='percent_expression', ascending=False)
+    return gene_expr_df, ground_truth_tfs
 
+def plot_gene_expression_violinplot(adata_rna, cell_type_list):
+    # Initialize a list to hold the data for each cell type
+    data_per_cell_type = []
+    
+    # Loop over each cell type and extract the percentage of genes expressed
+    for cell_type in cell_type_list:
+        # Extract the number of genes expressed for the given cell type
+        cell_type_data = adata_rna[adata_rna.obs['label'] == cell_type].obs["n_genes"]
+        
+        # Calculate the percentage of genes expressed
+        percentage_genes_expressed = cell_type_data
+        data_per_cell_type.append(percentage_genes_expressed)
 
-def plot_gene_expression(gene_expr_df, output_path):
-    """Plot a bar chart of gene expression percentages."""
-    plt.figure(figsize=(7, 4))
-    plt.bar(gene_expr_df['gene'], gene_expr_df['percent_expression'], color='skyblue')
-
-    # Set title and labels
-    plt.title('Percent of PBMC cells expressing each ground truth TF', fontsize=MEDIUM_SIZE)
-    plt.xlabel('Transcription Factor', fontsize=MEDIUM_SIZE)
-    plt.ylabel('Percent gene expression', fontsize=MEDIUM_SIZE)
-    plt.ylim(0, 100)
-    plt.xticks(rotation=45, fontsize=7)
-
-    # Adjust layout and save the figure
+    # Flatten the data for seaborn
+    flat_data = []
+    flat_labels = []
+    for idx, cell_type in enumerate(cell_type_list):
+        flat_data.extend(data_per_cell_type[idx])
+        flat_labels.extend([cell_type] * len(data_per_cell_type[idx]))
+    
+    # Create the violin plot
+    plt.figure(figsize=(10, 6))
+    sns.violinplot(x=flat_labels, y=flat_data, order=cell_type_list, cut=0)
+    
+    plt.title('Distribution of Genes Expressed by Cell Type')
+    plt.xlabel('Cell Type')
+    plt.ylabel('Number of Genes Expressed')
+    
+    # Rotate the x-axis labels by 45 degrees
+    plt.xticks(rotation=45, ha='right')
+    
+    # Adjust layout to avoid cutting off the bottom
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    
+    # Save the plot
+    plt.savefig(f'{OUTPUT_DIR}/gene_expression_violinplot_percentage_sorted.png', dpi=300)
     plt.close()
 
+def plot_tf_expression(gene_expr_df_sorted, cell_type):
+    fig, ax = plt.subplots(figsize=(7, 4))
 
-def calculate_trans_reg_potential(ground_truth_trans_reg, ground_truth_tfs):
-    """Calculate trans-regulatory potential score for each transcription factor."""
-    filtered_df = ground_truth_trans_reg[ground_truth_trans_reg['TF'].isin(ground_truth_tfs)]
-    tf_trans_reg_stats = filtered_df.groupby('TF')['Score'].agg(['mean', 'std']).reset_index()
-    return tf_trans_reg_stats.sort_values(by='mean', ascending=False)
+    # Plot a bar graph of the sorted gene expression percentages
+    ax.bar(gene_expr_df_sorted['gene'], gene_expr_df_sorted['percent_expression'])
 
+    # Set the title, labels, and limits
+    ax.set_title(f'Percent of {cell_type} expressing each ground truth TF', size=MEDIUM_SIZE)
+    ax.set_ylim(bottom=0, top=100)
+    ax.set_ylabel('Percent gene expression', size=MEDIUM_SIZE)
+    ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
 
-def plot_trans_reg_potential(tf_trans_reg_stats, output_path):
-    """Plot trans-regulatory potential score with error bars."""
-    plt.figure(figsize=(7, 4))
-    plt.bar(tf_trans_reg_stats['TF'], np.log10(tf_trans_reg_stats['mean']),
-            yerr=tf_trans_reg_stats['std'], color='skyblue', capsize=5)
+    # Add a dashed line at y=10
+    ax.axhline(y=10, color='black', linestyle='--', linewidth=1)
 
-    # Set title and labels
-    plt.title('Average trans-regulatory potential score for each TF in PBMC cells', fontsize=MEDIUM_SIZE)
-    plt.xlabel('Transcription Factor', fontsize=MEDIUM_SIZE)
-    plt.ylabel('Log10 Trans-regulatory potential score', fontsize=MEDIUM_SIZE)
-    plt.xticks(rotation=45, fontsize=7)
+    # Set y-axis ticks to show every 10%
+    ax.set_yticks(range(0, 101, 10))
 
-    # Adjust layout and save the figure
+    # Rotate the x-axis labels
+    ax.tick_params(axis='x', labelsize=7, rotation=45)
+
+    # Adjust layout to prevent cutting off
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+
+    # Save the figure
+    os.makedirs(f'{OUTPUT_DIR}/{cell_type}', exist_ok=True)
+    plt.savefig(f'{OUTPUT_DIR}/{cell_type}/Percent_Cells_Expressing_TF_Barplot.png', dpi=300)
     plt.close()
 
+# Read in the AnnData files for the scRNAseq and ground truth datasets
+adata_rna, ground_truth = read_dataset(ground_truth_sep=',', ground_truth_header=0)
 
-# Main script
-if __name__ == '__main__':
-    # Ensure output directory exists
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+# Find the number of cells and genes in the dataset
+num_cells = adata_rna.shape[0]
+num_genes = adata_rna.shape[1]
+print(f'\nTotal dataset size: {num_cells} cells x {num_genes} genes')
 
-    # Load data
-    adata_rna, ground_truth = load_data(ADATA_RNA_PATH, CHIP_SEQ_GROUND_TRUTH_PATH)
+# Calculate the overall gene expression across all cell types
+print(f'\nAverage gene expression: {round(np.average(adata_rna.obs["n_genes"]/num_genes)*100,2)}% ({round(np.average(adata_rna.obs["n_genes"]))})')
+print(f'Std dev gene expression: {round(np.std(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.std(adata_rna.obs["n_genes"]))})')
+print(f'Min gene expression: {round(np.min(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.min(adata_rna.obs["n_genes"]))})')
+print(f'Max gene expression: {round(np.max(adata_rna.obs["n_genes"])/num_genes*100,2)}% ({round(np.max(adata_rna.obs["n_genes"]))})')
 
-    # Calculate and plot cell type percentages
-    cell_type_percentage_list = calculate_cell_type_percentages(adata_rna)
-    plot_bar_chart(cell_type_percentage_list, 'Percentage of Cell Types', 'Cell Type', 'Percentage (%)',
-                   f'{OUTPUT_DIR}/cell_type_bar_chart.png', ylim_top=25)
+# Find the individual cell types in the dataset
+cell_type_list, cell_type_percentage_list = find_cell_types(adata_rna)
 
-    # Calculate gene expression statistics
-    num_cells, num_genes = adata_rna.shape
-    ground_truth_tfs = list(set(ground_truth['TF']))
-    gene_expr_df_sorted = calculate_gene_expression_stats(adata_rna, ground_truth_tfs)
+# Plot of the percentage of cell types in the dataset
+sorted_cell_type_set = cell_type_percentage_bar_plot(cell_type_percentage_list)
 
-    # Save gene expression statistics to a TSV file
+# Filter for cells expressing > 1000 genes
+cells_high_expression = adata_rna[adata_rna.obs['n_genes'] > 1000]
+print(f'{cells_high_expression.shape[0]} cells expressing >1000 genes')
+
+# Plot a histogram of the number of genes each cell is expressing
+plot_cell_expression_histogram(adata_rna, cell_type="PBMC")
+
+# Plot a violin plot of the percent of genex expressed by cell type
+plot_gene_expression_violinplot(adata_rna, sorted_cell_type_set)
+
+
+for cell_type in sorted_cell_type_set:
+    # Get the cell expression 
+    gene_expr_df, ground_truth_tfs = find_tf_expression(ground_truth, cell_type)
+
+    # Sort the dataframe
+    gene_expr_df_sorted = gene_expr_df.sort_values(by='percent_expression', ascending=False)
+
+    # Write the gene expression dataframe to a tsv file
     gene_expr_df_sorted.to_csv(f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_Tf.tsv', sep='\t', index=False)
 
-    # Plot gene expression percentages
-    plot_gene_expression(gene_expr_df_sorted, f'{OUTPUT_DIR}/PBMC_Percent_Cells_Expressing_TF_Barplot.png')
+    print(f'\nTF Expression in {cell_type}')
+    print(f'\tAverage TF expression: {round(np.average(gene_expr_df["percent_expression"]),2)}%')
+    print(f'\tStd dev TF expression: {round(np.std(gene_expr_df["percent_expression"]),2)}%')
+    print(f'\tMin TF expression: {round(np.min(gene_expr_df["percent_expression"]),2)}%')
+    print(f'\tMax TF expression: {round(np.max(gene_expr_df["percent_expression"]),2)}%')
 
-    # Load trans-regulatory potential data and calculate statistics
-    ground_truth_trans_reg = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, header=0, sep=',')
-    tf_trans_reg_stats_sorted = calculate_trans_reg_potential(ground_truth_trans_reg, ground_truth_tfs)
+    plot_tf_expression(gene_expr_df_sorted, cell_type)
 
-    # Plot trans-regulatory potential with error bars
-    plot_trans_reg_potential(tf_trans_reg_stats_sorted, f'{OUTPUT_DIR}/TF_Average_H1_Trans_Reg_Potential_Barplot_with_Errorbars.png')
 
+
+# Load the ground truth with trans-regulatory potential scores dataset
+ground_truth_trans_reg = pd.read_csv(f'{OUTPUT_DIR}/ground_truth_w_score.csv', header=0, sep=',')
+print(ground_truth_trans_reg.head())
+
+# Filter for transcription factors that are in ground_truth_tfs
+filtered_df = ground_truth_trans_reg[ground_truth_trans_reg['TF'].isin(ground_truth_tfs)]
+
+# Group by 'TF' and calculate the mean score for each group
+tf_trans_reg_score_dict = filtered_df.groupby('TF')['Score'].mean().to_dict()
+
+# Group by 'TF' and calculate the mean and standard deviation for each group
+tf_trans_reg_stats = filtered_df.groupby('TF')['Score'].agg(['mean', 'std']).reset_index()
+
+# Sort by the mean score
+tf_trans_reg_stats_sorted = tf_trans_reg_stats.sort_values(by='mean', ascending=False)
+
+# ------ TRANS-REGULATORY POTENTIAL BARPLOT WITH ERROR BARS ------
+# Create the plot
+fig, ax = plt.subplots(figsize=(7,4))
+
+# Plot a bar graph with error bars for the standard deviation
+ax.bar(tf_trans_reg_stats_sorted['TF'],
+       np.log10(tf_trans_reg_stats_sorted['mean']),
+       yerr=tf_trans_reg_stats_sorted['std'],
+       capsize=5)
+
+# Set plot title and labels
+ax.set_title('Average trans-regulatory potential score for each TF in PBMC cells', size=MEDIUM_SIZE)
+ax.set_ylabel('Log10 Trans-regulatory potential score', size=MEDIUM_SIZE)
+ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
+ax.tick_params(axis='x', labelsize=7, rotation=45)
+
+plt.tight_layout()
+plt.savefig(f'{OUTPUT_DIR}/TF_Average_PBMC_Trans_Reg_Potential_Barplot_with_Errorbars.png', dpi=300)
+plt.close()
+
+
+
+# Apply log10 transformation to the 'Score' column in filtered_df
+filtered_df['log10_Score'] = np.log10(filtered_df['Score'].replace(0, np.nan))
+
+# Group by 'TF' and calculate the mean and standard deviation in the log10 space
+tf_trans_reg_stats_log10 = filtered_df.groupby('TF')['log10_Score'].agg(['mean', 'std']).reset_index()
+
+# Merge the two datasets by 'TF' for overlapping barplots
+merged_df = pd.merge(gene_expr_df_sorted, tf_trans_reg_stats_log10, left_on='gene', right_on='TF')
+
+# ------ OVERLAPPING BAR PLOTS WITH LOG10 ERROR BARS ------
+# Create the plot
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Bar width and offset for overlapping bars
+bar_width = 0.4
+index = np.arange(len(merged_df))
+
+# Plot first set of bars (percent expression)
+ax.bar(index - bar_width/2, merged_df['percent_expression'], bar_width, label='Percent Expression')
+
+# Plot second set of bars (log-transformed trans-reg score) with error bars
+ax.bar(index + bar_width/2, 
+       merged_df['mean'],  # Mean log10-transformed score
+       bar_width, 
+       yerr=merged_df['std'],  # Standard deviation in the log10 space
+       capsize=2, 
+       label='Log10(Trans-reg Score)', 
+       color='orange')
+
+# Set plot title and labels
+ax.set_title('Percent Expression and Log10 Trans-regulatory Scores for TFs in PBMC Cells', size=MEDIUM_SIZE)
+ax.set_ylabel('Percent Expression / Log10(Trans-reg Score)', size=MEDIUM_SIZE)
+ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
+
+# Customize x-axis tick labels
+ax.set_xticks(index)
+ax.set_xticklabels(merged_df['TF'], rotation=45, ha='right', fontsize=7)
+
+# Add a legend
+ax.legend()
+
+# Adjust layout and save the figure
+plt.tight_layout()
+plt.savefig(f'{OUTPUT_DIR}/Overlapping_Barplot_TF_Percent_Trans_Reg_Scores.png', dpi=300)
+plt.close()
+
+# ------ VIOLIN PLOT ------
+# Apply log10 transformation to the 'Score' column, handling any non-positive values
+filtered_df['log2_Score'] = np.log2(filtered_df['Score'].replace(0, np.nan))
+
+# Drop any rows where the log10 transformed score is NaN (which happens if the original score is 0 or negative)
+filtered_df = filtered_df.dropna(subset=['log2_Score'])
+
+# Create the violin plot
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Create the violin plot using seaborn with the log10-transformed scores
+sns.violinplot(x='TF', y='log2_Score', data=filtered_df, ax=ax, scale='width', inner='quartile')
+
+# Set plot title and labels
+ax.set_title('Log2 Trans-regulatory potential scores for each TF in PBMC cells', size=MEDIUM_SIZE)
+ax.set_ylabel('Log2 Trans-regulatory potential score', size=MEDIUM_SIZE)
+ax.set_xlabel('Transcription Factor', size=MEDIUM_SIZE)
+
+# Customize x-axis tick labels
+ax.tick_params(axis='x', labelsize=7, rotation=45)
+
+# Adjust layout and save the figure
+plt.tight_layout()
+plt.savefig(f'{OUTPUT_DIR}/TF_Log2_Trans_Reg_Potential_Violin_Plot.png', dpi=300)
+plt.close()
