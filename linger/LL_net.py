@@ -963,7 +963,11 @@ def cell_type_specific_TF_RE_binding_chr(
     unique_cell_labels = list(set(cell_labels))
 
     # Compute the average accessibility of regulatory elements (REs) for the specific cell type
-    atac_cell_type_average = scATAC_data.X[np.array(cell_labels) == cell_type, :].mean(axis=0)
+    try:
+        atac_cell_type_average = scATAC_data.X[np.array(cell_labels) == cell_type, :].mean(axis=0)
+    except ZeroDivisionError:
+        print(f'No cells with cell type "{cell_type}". Check selected cell type name in "shared_variables.py"')
+
     regulatory_element_accessibility = pd.DataFrame(atac_cell_type_average.T, index=scATAC_data.var['gene_ids'].values, columns=['values'])
 
     # Compute the average gene expression (TG) for the specific cell type

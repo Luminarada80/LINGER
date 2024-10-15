@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import random
 from scipy.sparse import csc_matrix
 from anndata import AnnData
 
@@ -184,13 +185,15 @@ def pseudo_bulk(rna_data: AnnData, atac_data: AnnData, single_pseudo_bulk: int) 
     
     # Aggregate RNA expression and ATAC accessibility
     aggregated_rna: np.ndarray = (selected_connectivity_matrix @ rna_data.raw.X.toarray())
-    pseudo_bulk_rna: pd.DataFrame = pd.DataFrame(aggregated_rna / (neighbors_k - 1), 
-                                                 columns=selected_indices, 
-                                                 index=rna_data.raw.var['gene_ids'].tolist())
+    pseudo_bulk_rna: pd.DataFrame = pd.DataFrame(
+        (aggregated_rna / (neighbors_k - 1)).T, 
+        columns=selected_indices, 
+        index=rna_data.raw.var['gene_ids'].tolist())
     
     aggregated_atac: np.ndarray = (selected_connectivity_matrix @ atac_data.raw.X.toarray())
-    pseudo_bulk_atac: pd.DataFrame = pd.DataFrame(aggregated_atac / (neighbors_k - 1), 
-                                                  columns=selected_indices, 
-                                                  index=atac_data.raw.var['gene_ids'].tolist())
+    pseudo_bulk_atac: pd.DataFrame = pd.DataFrame(
+        (aggregated_atac / (neighbors_k - 1)).T, 
+        columns=selected_indices, 
+        index=atac_data.raw.var['gene_ids'].tolist())
     
     return pseudo_bulk_rna, pseudo_bulk_atac
