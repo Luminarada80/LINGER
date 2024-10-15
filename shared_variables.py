@@ -7,7 +7,7 @@ ground_truth_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOE
 matrix_path: str = f'{data_dir}/pbmc_matrix.mtx'
 features_path: str = f'{data_dir}/pbmc_features.tsv'
 barcodes_path: str = f'{data_dir}/pbmc_barcodes.tsv'
-label_path: str = f'{data_dir}/H1_label.txt'
+# label_path: str = f'{data_dir}/H1_label.txt'
 
 # H1 file paths
 
