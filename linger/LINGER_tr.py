@@ -459,6 +459,9 @@ def sc_nn_gpu(ii: int, gene_chr: pd.DataFrame, TFindex: list[str], TFindex_bulk:
     loaded_net = Net(input_size, activef).to(device)
     loaded_net.load_state_dict(netall[gene_idx_b])  # Load pre-trained weights
 
+    params = list(loaded_net.parameters())
+    fisher0 = fisherall[gene_idx_b][0].data.clone().to(device)
+
     fisher0 = fisherall[gene_idx_b][0].data.clone().to(device)
     params_bulk = params[0][:, np.array(range(len(params[0])), dtype=int)].to(device)
 

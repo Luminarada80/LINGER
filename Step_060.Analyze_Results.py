@@ -12,15 +12,19 @@ import shared_variables
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-CELL_TYPE = '0' # H1
+CELL_TYPE = 'classical monocytes' # H1
 
 # Define constants for file paths
-TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
-CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
-TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/H1_Linger_Ground_Truth.tsv'
+# TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_population_TF_RE_binding.txt'
+# CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_cis_regulatory.txt'
+# TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_trans_regulatory.txt'
 
-RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER'
+TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_classical monocytes.txt'
+CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_classical monocytes.txt'
+TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_classical monocytes.txt'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/PBMC_cistrome_ground_truth.csv'
+
+RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
 
 def load_data():
     """Load transcription factor (TF), cis-regulatory, and trans-regulatory network data."""
@@ -50,7 +54,7 @@ def process_tf_tg_pairs(ground_truth: pd.DataFrame, trans_reg_network: pd.DataFr
             value = trans_reg_network.loc[row[1], row[0]]
             tf_list.append(row[0])
             tg_list.append(row[1])
-            value_list.append(round(value, 2))
+            value_list.append(value)
         except KeyError:
             # Handle missing value case
             num_nan += 1
@@ -82,7 +86,7 @@ def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df
     plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='LINGER trans-reg network')
     plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='Ground truth network')
 
-    plt.title('Histogram of inferred trans-regulatory potential scores and ground truth scores')
+    plt.title('Trans-regulatory potential scores')
     plt.rc('')
     plt.ylabel('Frequency (log)')
     plt.xlabel('log2 LINGER trans-regulatory potential score')
