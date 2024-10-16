@@ -876,13 +876,16 @@ def TF_RE_binding(
 
     if method == 'scNN':
         # Load data required for scNN method
-        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, genome)
-        # Load RE-TG link information from a file
-        RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
-        RE_TGlink.columns = [0, 1, 'chr']  # Rename columns for consistency
+        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
-        # Get the list of unique chromosomes from the RE_TGlink DataFrame
+        # Load RE-TG link information from the file and set appropriate column names
+        RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
+        RE_TGlink.columns = ['RE', 'gene', 'distance']  # Adjust the columns based on the dataset structure
+
+        RE_TGlink['chr'] = RE_TGlink['RE'].apply(lambda x: x.split(':')[0])
+        # Extract unique chromosomes from the RE_TGlink DataFrame
         chrlist = RE_TGlink['chr'].unique()
+
         # Extract indices for regulatory elements, target genes, and transcription factors
         REName = Opn.index
         geneName = Target.index
@@ -890,27 +893,30 @@ def TF_RE_binding(
 
         # Initialize an empty DataFrame to store all results
         result_all = pd.DataFrame([])
+
         # Iterate over all unique chromosomes present in the RE_TGlink DataFrame
-        for jj in tqdm(range(0, len(chrlist))):
+        for jj in tqdm(range(len(chrlist))):  # Use len(chrlist) instead of hardcoding 23
             chrtemp = chrlist[jj]  # Get the current chromosome
             # Filter the RE_TGlink DataFrame for the current chromosome
-            RE_TGlink1 = RE_TGlink[RE_TGlink['chr'] == chrtemp]
+            RE_TGlink_chr = RE_TGlink[RE_TGlink['chr'] == chrtemp]
 
             # Load the pre-trained neural network model for the current chromosome
-            net_all = torch.load(outdir + chrtemp + '_net.pt')
-            # Call the function to compute TF binding using scNN method
-            result = TF_RE_scNN(TFName, geneName, net_all, RE_TGlink1, REName)
+            net_all = torch.load(outdir + str(chrtemp) + '_net.pt')
+
+            # Compute TF binding using scNN method for the current chromosome
+            result = TF_RE_scNN(TFName, geneName, net_all, RE_TGlink_chr, REName)
 
             # Save the result for the current chromosome to a file
             result.to_csv(outdir + chrtemp + '_cell_population_TF_RE_binding.txt', sep='\t')
+
             # Concatenate the result for the current chromosome to the overall result DataFrame
             result_all = pd.concat([result_all, result], axis=0)
 
         # Copy the combined results to the result variable
         result = result_all.copy()
 
-    # Save the final concatenated result for all chromosomes to a file
-    result.to_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t')
+        # Save the final concatenated result for all chromosomes to a file
+        result.to_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t')
         
 
 def cell_type_specific_TF_RE_binding_chr(
@@ -1690,7 +1696,7 @@ def load_RE_TG_scNN(outdir: str) -> tuple[np.ndarray, np.ndarray, list[str], lis
     """
 
     # Load the RE-TG distance data
-    dis: pd.DataFrame = pd.read_csv('data/RE_gene_distance.txt', sep='\t', header=0)
+    dis: pd.DataFrame = pd.read_csv(f'{outdir}/RE_gene_distance.txt', sep='\t', header=0)
 
     # Apply exponential decay transformation to the distance values
     dis['distance'] = np.exp(-(0.5 + dis['distance'] / 25000))
@@ -1985,7 +1991,7 @@ def cis_reg(
     # If the selected method is 'scNN', process using the 'cis_shap_scNN' function
     elif method == 'scNN':
         # Load single-cell neural network (scNN) data
-        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, genome)
+        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
         # Load the RE-TG link data from a file
         RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
@@ -2613,10 +2619,10 @@ def trans_reg(
     # If the selected method is 'scNN', calculate the trans-regulatory network using single-cell neural network data
     elif method == 'scNN':
         # Load the single-cell neural network (scNN) data
-        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, genome)
+        Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
         # Load the RE-TG link data
-        RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
+        RE_TGlink = pd.read_csv(outdir + 'RE_gene_distance.txt', sep='\t', header=0)
         RE_TGlink.columns = [0, 1, 'chr']  # Set the column names
 
         # Get the list of unique chromosomes from the RE-TG link data
@@ -2853,6 +2859,8 @@ def TF_RE_scNN(
 
 def load_data_scNN(
     GRNdir: str, 
+    outdir: str,
+    data_dir: str,
     genome: str
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -2886,17 +2894,17 @@ def load_data_scNN(
     TFName = pd.DataFrame(Match2['TF'].unique())
 
     # Load target gene expression data from pseudobulk RNA-seq data
-    Target = pd.read_csv('data/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Target = pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
 
     # Filter target genes to keep only those that overlap with the TF names
     TFlist = list(set(Target.index) & set(TFName[0].values))  # Get overlapping genes
     Exp = Target.loc[TFlist]  # Filter expression data for these TFs
 
     # Load open chromatin data (regulatory elements, REs) from pseudobulk ATAC-seq data
-    Opn = pd.read_csv('data/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Opn = pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
 
     # Load RE-TG link data (links regulatory elements to target genes based on distance)
-    RE_TGlink = pd.read_csv('data/RE_gene_distance.txt', sep='\t', header=0)
+    RE_TGlink = pd.read_csv(f'{outdir}RE_TGlink.txt', sep='\t', header=0)
 
     # Group REs by target genes and convert to a list of REs for each gene
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()

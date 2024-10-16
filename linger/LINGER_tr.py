@@ -492,7 +492,7 @@ def sc_nn_gpu(ii: int, gene_chr: pd.DataFrame, TFindex: list[str], TFindex_bulk:
     return loaded_net, shap_values, 0.5, 0.5, 1, Loss0
 
 
-def get_TSS(GRNdir: str, genome: str, TSS_dis: int) -> None:
+def get_TSS(GRNdir: str, genome: str, TSS_dis: int, output_dir: str) -> None:
     """
     Processes transcription start site (TSS) data for a specified genome and outputs an extended TSS region. 
     The function loads TSS data from a file, calculates extended regions around the TSS based on a given distance, 
@@ -505,6 +505,8 @@ def get_TSS(GRNdir: str, genome: str, TSS_dis: int) -> None:
             The genome version (e.g., 'hg19', 'mm10') used to select the appropriate TSS file.
         TSS_dis (int):
             The distance (in base pairs) to extend upstream and downstream of the TSS to define the regulatory region.
+        output_dir (str):
+            Data directory to save the processed TSS data files
     
     Returns:
         None:
@@ -540,7 +542,7 @@ def get_TSS(GRNdir: str, genome: str, TSS_dis: int) -> None:
     Tssdf = Tssdf[Tssdf['symbol'] != '']
 
     # Save the processed DataFrame with the extended regions to a new file
-    Tssdf[['chr', '1M-', '1M+', 'symbol', 'TSS', 'strand']].to_csv('data/TSS_extend_1M.txt', sep='\t', index=None)
+    Tssdf[['chr', '1M-', '1M+', 'symbol', 'TSS', 'strand']].to_csv(f'{output_dir}/TSS_extend_1M.txt', sep='\t', index=None)
 
 
 def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, pd.DataFrame, pd.DataFrame]:
@@ -761,7 +763,7 @@ def sc_nn_NN(ii: int, RE_TGlink_temp: list, Target: pd.DataFrame, Exp: pd.DataFr
     return net, shap_values, Loss0
 
 
-def load_data_scNN(GRNdir: str, species: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data_scNN(GRNdir: str, species: str, data_dir: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Loads transcription factor (TF), target gene (TG), regulatory element (RE) data, and RE-TG link information 
     for use in a single-cell neural network (scNN) model. The function reads relevant files, processes TF motifs, 
@@ -774,6 +776,9 @@ def load_data_scNN(GRNdir: str, species: str) -> tuple[pd.DataFrame, pd.DataFram
         species (str):
             The species identifier (e.g., 'hg19' for human, 'mm10' for mouse) used to select the appropriate 
             transcription factor motif file.
+
+        data_dir (str):
+            Data directory containing the pseudobulk and RE gene distance files
     
     Returns:
         tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -796,7 +801,7 @@ def load_data_scNN(GRNdir: str, species: str) -> tuple[pd.DataFrame, pd.DataFram
     TFName = pd.DataFrame(Match2['TF'].unique())
     
     # Load target gene (TG) pseudobulk expression data
-    Target = pd.read_csv('data/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Target = pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
     
     # Find common transcription factors (TFs) between the Target genes and the TFName list
     TFlist = list(set(Target.index) & set(TFName[0].values))
@@ -805,10 +810,10 @@ def load_data_scNN(GRNdir: str, species: str) -> tuple[pd.DataFrame, pd.DataFram
     Exp = Target.loc[TFlist]
     
     # Load regulatory element (RE) pseudobulk chromatin accessibility (openness) data
-    Opn = pd.read_csv('data/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Opn = pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
     
     # Load the RE-to-TG distance link file
-    RE_TGlink = pd.read_csv('data/RE_gene_distance.txt', sep='\t', header=0)
+    RE_TGlink = pd.read_csv(f'{data_dir}/RE_gene_distance.txt', sep='\t', header=0)
     
     # Group the RE-TGlink by gene and aggregate the regulatory elements (REs) for each target gene (TG)
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()
@@ -826,13 +831,15 @@ def load_data_scNN(GRNdir: str, species: str) -> tuple[pd.DataFrame, pd.DataFram
     return Exp, Opn, Target, RE_TGlink
 
 
-def RE_TG_dis(outdir: str) -> None:
+def RE_TG_dis(data_dir: str, outdir: str) -> None:
     """
     Overlaps genomic regions (regulatory elements) with gene locations and calculates the distance 
     between regulatory elements (REs) and transcription start sites (TSS). The function outputs the 
     RE-to-gene distance data in a text file.
 
     Parameters:
+        data_dir (str):
+            The output directory containing the "Peaks.txt" file
         outdir (str):
             The output directory where the RE-gene distance file will be saved.
 
@@ -850,12 +857,8 @@ def RE_TG_dis(outdir: str) -> None:
     # Print status message
     print('Overlap the regions with gene loc ...')
 
-    # Create the output directory if it does not exist
-    current_directory = os.getcwd()
-    os.makedirs(outdir, exist_ok=True)
-
     # Load peak (regulatory element) data from the 'Peaks.txt' file
-    peakList = pd.read_csv(current_directory + '/data/Peaks.txt', index_col=None, header=None)
+    peakList = pd.read_csv(data_dir + '/Peaks.txt', index_col=None, header=None)
 
     # Parse the peak data into separate columns for chromosome, start, and end positions
     peakList1 = [temp.split(':')[0] for temp in peakList[0].values.tolist()]  # Extract chromosome
@@ -868,17 +871,17 @@ def RE_TG_dis(outdir: str) -> None:
     peakList['end'] = peakList3
 
     # Save the peak data as a BED file for further processing
-    peakList[['chr', 'start', 'end']].to_csv(current_directory + '/data/Peaks.bed', sep='\t', header=None, index=None)
+    peakList[['chr', 'start', 'end']].to_csv(outdir + '/Peaks.bed', sep='\t', header=None, index=None)
 
     # Load transcription start site (TSS) data with extended regions (1M upstream/downstream)
-    TSS_1M = pd.read_csv(current_directory + '/data/TSS_extend_1M.txt', sep='\t', header=0)
+    TSS_1M = pd.read_csv(outdir + '/TSS_extend_1M.txt', sep='\t', header=0)
 
     # Save the TSS data as a BED file
-    TSS_1M.to_csv(current_directory + '/data/TSS_extend_1M.bed', sep='\t', header=None, index=None)
+    TSS_1M.to_csv(outdir + '/TSS_extend_1M.bed', sep='\t', header=None, index=None)
 
     # Use pybedtools to read the peak and TSS data in BED format
-    a = pybedtools.example_bedtool(current_directory + '/data/Peaks.bed')
-    b = pybedtools.example_bedtool(current_directory + '/data/TSS_extend_1M.bed')
+    a = pybedtools.example_bedtool(outdir + '/Peaks.bed')
+    b = pybedtools.example_bedtool(outdir + '/TSS_extend_1M.bed')
 
     # Compute the overlap between peaks (REs) and TSS regions
     a_with_b = a.intersect(b, wa=True, wb=True)
@@ -900,7 +903,7 @@ def RE_TG_dis(outdir: str) -> None:
     temp['distance'] = np.abs(a_with_b[7] - a_with_b[1])
 
     # Save the RE-gene distance data to a file
-    temp.to_csv(current_directory + '/data/RE_gene_distance.txt', sep='\t', index=None)
+    temp.to_csv(outdir + '/RE_gene_distance.txt', sep='\t', index=None)
 
 
 def training_cpu(GRNdir: str, method: str, outdir: str, activef: str, species: str) -> None:
@@ -942,93 +945,93 @@ def training_cpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
     """
     
     # Set parameters for the LINGER method
-    if method == 'LINGER':
-        hidden_size = 64  # First hidden layer size
-        hidden_size2 = 16  # Second hidden layer size
-        output_size = 1  # Output size
-        l1_lambda = 0.01  # Regularization parameter for L1 regularization
-        alpha_l = 0.01  # Elastic net parameter (not currently used)
-        lambda0 = 0.00  # Bulk regularization (not currently used)
-        fisher_w = 0.1  # Weight for the Fisher regularization term
-        n_jobs = 16  # Number of CPU cores to use for parallel processing (not currently used)
+    # if method == 'LINGER':
+    hidden_size = 64  # First hidden layer size
+    hidden_size2 = 16  # Second hidden layer size
+    output_size = 1  # Output size
+    l1_lambda = 0.01  # Regularization parameter for L1 regularization
+    alpha_l = 0.01  # Elastic net parameter (not currently used)
+    lambda0 = 0.00  # Bulk regularization (not currently used)
+    fisher_w = 0.1  # Weight for the Fisher regularization term
+    n_jobs = 16  # Number of CPU cores to use for parallel processing (not currently used)
 
-        # Load necessary data from the GRN directory
-        Exp, idx, Opn, adj_matrix_all, Target, data_merge, TF_match = load_data(GRNdir, outdir)
-        
-        # Save the merged data to a file
-        data_merge.to_csv(outdir + 'data_merge.txt', sep='\t')
+    # Load necessary data from the GRN directory
+    Exp, idx, Opn, adj_matrix_all, Target, data_merge, TF_match = load_data(GRNdir, outdir)
+    
+    # Save the merged data to a file
+    data_merge.to_csv(outdir + 'data_merge.txt', sep='\t')
 
-        # List of chromosomes to process (1-22 and X)
-        chrall = ['chr' + str(i + 1) for i in range(22)]
-        chrall.append('chrX')
-        
-        # Loop through each chromosome
-        for i in range(23):
-            netall_s = {}  # Dictionary to store trained models
-            shapall_s = {}  # Dictionary to store SHAP values
-            result = np.zeros([data_merge.shape[0], 2])  # Array to store prediction results
-            Lossall = np.zeros([data_merge.shape[0], 100])  # Array to store loss values for each gene
+    # List of chromosomes to process (1-22 and X)
+    chrall = ['chr' + str(i + 1) for i in range(22)]
+    chrall.append('chrX')
+    
+    # Loop through each chromosome
+    for i in range(23):
+        netall_s = {}  # Dictionary to store trained models
+        shapall_s = {}  # Dictionary to store SHAP values
+        result = np.zeros([data_merge.shape[0], 2])  # Array to store prediction results
+        Lossall = np.zeros([data_merge.shape[0], 100])  # Array to store loss values for each gene
 
-            chr = chrall[i]  # Current chromosome
-            print(chr)
+        chr = chrall[i]  # Current chromosome
+        print(chr)
 
-            # Load chromosome-specific index files
-            idx_file1 = GRNdir + chr + '_index.txt'
-            idx_file_all = GRNdir + chr + '_index_all.txt'
-            idx_bulk = pd.read_csv(idx_file1, header=None, sep='\t')
-            idxRE_all = pd.read_csv(idx_file_all, header=None, sep='\t')
+        # Load chromosome-specific index files
+        idx_file1 = GRNdir + chr + '_index.txt'
+        idx_file_all = GRNdir + chr + '_index_all.txt'
+        idx_bulk = pd.read_csv(idx_file1, header=None, sep='\t')
+        idxRE_all = pd.read_csv(idx_file_all, header=None, sep='\t')
 
-            # Filter data for the current chromosome
-            gene_chr = data_merge[data_merge['chr'] == chr]
-            N = len(gene_chr)
+        # Filter data for the current chromosome
+        gene_chr = data_merge[data_merge['chr'] == chr]
+        N = len(gene_chr)
 
-            # Extract transcription factor (TF) and regulatory element (RE) indices
-            TFindex = idx.values[:, 2]
-            REindex = idx.values[:, 1]
-            REindex_bulk_match = idx.values[:, 3]
-            REindex_bulk = idxRE_all.values[:, 0]
-            TFindex_bulk = idx_bulk.values[:, 2]
-            input_size_all = idx_bulk.values[:, 3]
+        # Extract transcription factor (TF) and regulatory element (RE) indices
+        TFindex = idx.values[:, 2]
+        REindex = idx.values[:, 1]
+        REindex_bulk_match = idx.values[:, 3]
+        REindex_bulk = idxRE_all.values[:, 0]
+        TFindex_bulk = idx_bulk.values[:, 2]
+        input_size_all = idx_bulk.values[:, 3]
 
-            # Load pre-trained models and Fisher matrices for the current chromosome
-            fisherall = torch.load(GRNdir + 'fisher_' + chr + '.pt')
-            netall = torch.load(GRNdir + 'all_models_' + chr + '.pt')
+        # Load pre-trained models and Fisher matrices for the current chromosome
+        fisherall = torch.load(GRNdir + 'fisher_' + chr + '.pt')
+        netall = torch.load(GRNdir + 'all_models_' + chr + '.pt')
 
-            # Loop through each gene in the current chromosome
-            for ii in tqdm(range(N)):
-                warnings.filterwarnings("ignore")
-                
-                # Perform scNN training and SHAP computation for the current gene
-                res = sc_nn_cpu(ii, gene_chr, TFindex, TFindex_bulk, REindex, REindex_bulk, REindex_bulk_match, Target, netall, adj_matrix_all, Exp, TF_match, input_size_all, fisherall, Opn, l1_lambda, fisher_w, activef)
-                warnings.resetwarnings()
-                
-                # Store results for the current gene
-                index_all = gene_chr.index[ii]
-                if res[4] == 1:
-                    result[index_all, 0] = res[2]  # Store SHAP-based result for gene expression prediction
-                    result[index_all, 1] = res[3]
-                    netall_s[index_all] = res[0]  # Store the trained neural network
-                    shapall_s[index_all] = res[1]  # Store the SHAP values
-                    Lossall[index_all, :] = res[5].T  # Store the loss values
-                else:
-                    result[index_all, 0] = -100  # Mark failed predictions with a placeholder value
+        # Loop through each gene in the current chromosome
+        for ii in tqdm(range(N)):
+            warnings.filterwarnings("ignore")
+            
+            # Perform scNN training and SHAP computation for the current gene
+            res = sc_nn_cpu(ii, gene_chr, TFindex, TFindex_bulk, REindex, REindex_bulk, REindex_bulk_match, Target, netall, adj_matrix_all, Exp, TF_match, input_size_all, fisherall, Opn, l1_lambda, fisher_w, activef)
+            warnings.resetwarnings()
+            
+            # Store results for the current gene
+            index_all = gene_chr.index[ii]
+            if res[4] == 1:
+                result[index_all, 0] = res[2]  # Store SHAP-based result for gene expression prediction
+                result[index_all, 1] = res[3]
+                netall_s[index_all] = res[0]  # Store the trained neural network
+                shapall_s[index_all] = res[1]  # Store the SHAP values
+                Lossall[index_all, :] = res[5].T  # Store the loss values
+            else:
+                result[index_all, 0] = -100  # Mark failed predictions with a placeholder value
 
-            # Save results for the current chromosome
-            result = pd.DataFrame(result)
-            result.index = data_merge['Symbol'].values
-            genetemp = data_merge[data_merge['chr'] == chr]['Symbol'].values
-            result = result.loc[genetemp]
-            result.to_csv(outdir + 'result_' + chr + '.txt', sep='\t')
+        # Save results for the current chromosome
+        result = pd.DataFrame(result)
+        result.index = data_merge['Symbol'].values
+        genetemp = data_merge[data_merge['chr'] == chr]['Symbol'].values
+        result = result.loc[genetemp]
+        result.to_csv(outdir + 'result_' + chr + '.txt', sep='\t')
 
-            # Save the trained models and SHAP values for the current chromosome
-            torch.save(netall_s, outdir + 'net_' + chr + '.pt')
-            torch.save(shapall_s, outdir + 'shap_' + chr + '.pt')
+        # Save the trained models and SHAP values for the current chromosome
+        torch.save(netall_s, outdir + 'net_' + chr + '.pt')
+        torch.save(shapall_s, outdir + 'shap_' + chr + '.pt')
 
-            # Save loss values for the current chromosome
-            Lossall = pd.DataFrame(Lossall)
-            Lossall.index = data_merge['Symbol'].values
-            Lossall = Lossall.loc[genetemp]
-            Lossall.to_csv(outdir + 'Loss_' + chr + '.txt', sep='\t')
+        # Save loss values for the current chromosome
+        Lossall = pd.DataFrame(Lossall)
+        Lossall.index = data_merge['Symbol'].values
+        Lossall = Lossall.loc[genetemp]
+        Lossall.to_csv(outdir + 'Loss_' + chr + '.txt', sep='\t')
 
 
 def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: str) -> None:
@@ -1161,3 +1164,41 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
             Lossall.index = data_merge['Symbol'].values
             Lossall = Lossall.loc[genetemp]
             Lossall.to_csv(outdir + 'Loss_' + chrom + '.txt', sep='\t')
+    if method=='scNN':
+        hidden_size  = 64
+        hidden_size2 = 16
+        output_size = 1
+        l1_lambda = 0.01 
+        alpha_l = 0.01#elastic net parameter
+        lambda0 = 0.00 #bulk
+        fisher_w=0.1
+        n_jobs=16
+        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,species)
+        import warnings
+        import time
+        from tqdm import tqdm
+        netall_s={}
+        shapall_s={}
+        #result=np.zeros([data_merge.shape[0],2])
+        chrall=[RE_TGlink[0][i][0].split(':')[0] for i in range(RE_TGlink.shape[0])]
+        RE_TGlink['chr']=chrall
+        chrlist=RE_TGlink['chr'].unique()
+        for jj in tqdm(range(len(chrlist))):
+            chrtemp=chrlist[jj]
+            RE_TGlink1=RE_TGlink[RE_TGlink['chr']==chrtemp]
+            Lossall=np.zeros([RE_TGlink1.shape[0],100])
+            for ii in  range(RE_TGlink1.shape[0]):
+                warnings.filterwarnings("ignore")
+                #res = Parallel(n_jobs=n_jobs)(delayed(sc_nn_NN)(ii,RE_TGlink_temp,Target,netall,Exp,Opn,l1_lambda,activef)  for ii in tqdm(range(RE_TGlink.shape[0]))
+                RE_TGlink_temp=RE_TGlink1.values[ii,:]
+                res=sc_nn_NN(ii,RE_TGlink_temp,Target,Exp,Opn,l1_lambda,activef)
+                warnings.resetwarnings()
+                netall_s[ii]=res[0]
+                shapall_s[ii]=res[1]
+                Lossall[ii,:]=res[2].T   
+            torch.save(netall_s,outdir+chrtemp+'_net.pt')
+            torch.save(shapall_s,outdir+chrtemp+'_shap.pt')
+            Lossall=pd.DataFrame(Lossall)
+            Lossall.index=RE_TGlink1['gene'].values
+            Lossall.to_csv(outdir+chrtemp+'_Loss.txt',sep='\t') 
+        RE_TGlink.to_csv(outdir+'RE_TGlink.txt',sep='\t',index=None)

@@ -11,7 +11,7 @@ adata_ATAC = sc.read_h5ad(shared_variables.adata_ATAC_outpath)
 # Calculate the TF RE binding potential
 print(f'Calculating the TF RE binding potential')
 LL_net.TF_RE_binding(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   shared_variables.data_dir,
   adata_RNA,
   adata_ATAC,
@@ -23,7 +23,7 @@ LL_net.TF_RE_binding(
 # Calculate the cis-regulatory scores
 print(f'Calculating the cis-regulatory network')
 LL_net.cis_reg(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   shared_variables.data_dir,
   adata_RNA,
   adata_ATAC,
@@ -35,7 +35,7 @@ LL_net.cis_reg(
 # Calculate the trans-regulatory scores
 print(f'Calculating the trans-regulatory network')
 LL_net.trans_reg(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   shared_variables.data_dir,
   shared_variables.method,
   shared_variables.output_dir,

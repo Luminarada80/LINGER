@@ -4,3 +4,4 @@
 *.tsv
 *.err
 *.pyc
+/data/*

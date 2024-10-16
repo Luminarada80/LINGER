@@ -10,7 +10,7 @@ adata_ATAC = sc.read_h5ad(shared_variables.adata_ATAC_outpath)
 
 print(f'Calculating cell-type specific TF RE binding for celltype "{shared_variables.celltype}"')
 LL_net.cell_type_specific_TF_RE_binding(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   adata_RNA,
   adata_ATAC,
   shared_variables.genome,
@@ -21,7 +21,7 @@ LL_net.cell_type_specific_TF_RE_binding(
 
 print(f'Calculating cell-type specific cis-regulatory network for celltype "{shared_variables.celltype}"')
 LL_net.cell_type_specific_cis_reg(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   adata_RNA,
   adata_ATAC,
   shared_variables.genome,
@@ -32,7 +32,7 @@ LL_net.cell_type_specific_cis_reg(
 
 print(f'Calculating cell-type specific trans-regulatory network for celltype "{shared_variables.celltype}"')
 LL_net.cell_type_specific_trans_reg(
-  shared_variables.bulk_model_dir,
+  shared_variables.tss_motif_info_path,
   adata_RNA,
   shared_variables.celltype,
   shared_variables.output_dir,
