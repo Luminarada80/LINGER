@@ -2,3 +2,4 @@
 *.gexf
 *.csv
 *.tsv
+*.err
