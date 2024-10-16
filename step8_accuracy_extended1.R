@@ -19,10 +19,12 @@ ground_truth$interaction <- paste(tolower(ground_truth$Source), tolower(ground_t
 inferred_network$interaction <- paste(tolower(inferred_network$source), tolower(inferred_network$target), sep = "_")
 ground_truth
 inferred_network
+
 # Step 3: Merge inferred network with ground truth
 merged_network <- inferred_network %>%
   mutate(true_interaction = ifelse(interaction %in% ground_truth$interaction, 1, 0))
 merged_network
+
 # Step 4: Balance the dataset by equalizing positive and negative samples
 positive_samples <- merged_network %>% filter(true_interaction == 1)
 negative_samples <- merged_network %>% filter(true_interaction == 0)

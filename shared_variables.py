@@ -1,13 +1,11 @@
 # Main paths
 uzun_lab_dir: str = '/gpfs/Labs/Uzun'
-data_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_SC_DATA'
+data_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA'
 ground_truth_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME'
 
 # PBMC file paths
-matrix_path: str = f'{data_dir}/pbmc_matrix.mtx'
-features_path: str = f'{data_dir}/pbmc_features.tsv'
-barcodes_path: str = f'{data_dir}/pbmc_barcodes.tsv'
-label_path: str = f'{data_dir}/PBMC_label.txt'
+rna_data_path: str = f'{data_dir}/subsampled_RNA_1000.csv'
+atac_data_path: str = f'{data_dir}/subsampled_ATAC_1000.csv'
 
 # H1 file paths
 
@@ -25,7 +23,7 @@ peak_file_path: str = f'{data_dir}/Peaks.txt'
 bulk_model_dir: str = f'{data_dir}/../LINGER_BULK_MODEL/'
 
 # Output directory
-output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_TRAINED_MODEL/'
+output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL/'
 
 # Decide which method to use (scNN or LINGER)
 genome: str ='hg38'

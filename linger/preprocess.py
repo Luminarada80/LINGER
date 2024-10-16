@@ -695,10 +695,11 @@ def get_adata(matrix: csc_matrix, features: pd.DataFrame, barcodes: pd.DataFrame
     matrix.data = matrix.data.astype(np.float32)
 
     # Create an AnnData object with the transposed matrix (cells as rows, features as columns)
-    adata = anndata.AnnData(X=csc_matrix(matrix.T))
+    adata = anndata.AnnData(X=csc_matrix(matrix).T)
+    print(adata.shape)
     
     # Assign feature names (e.g., gene IDs or peak names) to the variable (features) metadata in AnnData
-    adata.var['gene_ids'] = features[1].values
+    adata.var['gene_ids'] = features[0].values
     
     # Assign cell barcodes to the observation (cells) metadata in AnnData
     adata.obs['barcode'] = barcodes[0].values
@@ -712,11 +713,11 @@ def get_adata(matrix: csc_matrix, features: pd.DataFrame, barcodes: pd.DataFrame
 
     # Subset features based on their type (Gene Expression or Peaks)
     # Select rows corresponding to "Gene Expression"
-    rows_to_select: pd.Index = features[features[2] == 'Gene Expression'].index
+    rows_to_select: pd.Index = features[features[1] == 'Gene Expression'].index
     adata_RNA = adata[:, rows_to_select]
 
     # Select rows corresponding to "Peaks"
-    rows_to_select = features[features[2] == 'Peaks'].index
+    rows_to_select = features[features[1] == 'Peaks'].index
     adata_ATAC = adata[:, rows_to_select]
 
     ### If cell-type label (annotation) is provided, filter and annotate AnnData objects based on the label

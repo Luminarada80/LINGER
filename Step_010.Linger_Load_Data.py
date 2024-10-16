@@ -15,47 +15,61 @@ warnings.filterwarnings("ignore", message="Trying to modify attribute `.obs` of 
 # Specify the method
 method='LINGER'
 
-# ----- THIS PART DIFFERS BETWEEN PBMC AND H1 -----
+# ----- THIS PART DIFFERS BETWEEN DATASETS -----
 print('\tReading in cell labels...')
-# Read in the data files
-matrix=scipy.io.mmread(shared_variables.matrix_path)
-features=pd.read_csv(shared_variables.features_path,sep='\t',header=None)
-barcodes=pd.read_csv(shared_variables.barcodes_path,sep='\t',header=None)
-label=pd.read_csv(shared_variables.label_path,sep='\t',header=0)
+# Load scRNA-seq data
+rna_data = pd.read_csv(shared_variables.rna_data_path, sep=',', index_col=0)
+atac_data = pd.read_csv(shared_variables.atac_data_path, sep=',', index_col=0)
+
+# Create the data matrix by concatenating the RNA and ATAC data by their indices
+matrix = csc_matrix(pd.concat([rna_data,atac_data], axis=0).values)
+features = pd.DataFrame({
+    0: rna_data.index.tolist() + atac_data.index.tolist(),  # Combine RNA and ATAC feature names
+    1: ['Gene Expression'] * len(rna_data.index) + ['Peaks'] * len(atac_data.index)  # Assign types
+})
+print(features)
+barcodes=pd.DataFrame(rna_data.columns.values,columns=[0])
+
+label = pd.DataFrame({
+    'barcode_use': barcodes[0].values,  # Use the same barcodes as in the RNA and ATAC data
+    'label': ['mESC'] * len(barcodes)  # Set the label to "mESC" for all cells
+})
+
 # ---------------------------------------------------
 
 print('\nExtracting the adata RNA and ATAC seq data...')
 # Create AnnData objects for the scRNA-seq and scATAC-seq datasets
-adata_RNA, adata_ATAC = get_adata(matrix, features, barcodes, label)  # adata_RNA and adata_ATAC are scRNA and scATAC
+adata_RNA, adata_ATAC = get_adata(matrix, features, barcodes, label)
 
-print(f'\tscRNAseq Dataset: {adata_RNA.shape[0]} genes, {adata_RNA.shape[1]} cells')
-print(f'\tscATACseq Dataset: {adata_ATAC.shape[0]} peaks, {adata_ATAC.shape[1]} cells')
+
+print(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
+print(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
 # Remove low counts cells and genes
 print('\nFiltering Data')
 print(f'\tFiltering out cells with less than 200 genes...')
 sc.pp.filter_cells(adata_RNA, min_genes=200)
 adata_RNA = adata_RNA.copy()  # Ensure adata_RNA is not a view after filtering
-print(f'\t\tShape of the RNA dataset = {adata_RNA.shape[0]} genes, {adata_RNA.shape[1]} cells')
+print(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
 
 print(f'\tFiltering out genes expressed in fewer than 3 cells...')
 sc.pp.filter_genes(adata_RNA, min_cells=3)
 adata_RNA = adata_RNA.copy()  # Ensure adata_RNA is not a view after filtering
-print(f'\t\tShape of the RNA dataset = {adata_RNA.shape[0]} genes, {adata_RNA.shape[1]} cells')
+print(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
 
 print(f'\tFiltering out cells with less than 200 ATAC-seq peaks...')
 sc.pp.filter_cells(adata_ATAC, min_genes=200)
 adata_ATAC = adata_ATAC.copy()  # Ensure adata_ATAC is not a view after filtering
-print(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[0]} peaks, {adata_ATAC.shape[1]} cells')
+print(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
 print(f'\tFiltering out peaks expressed in fewer than 3 cells...')
 sc.pp.filter_genes(adata_ATAC, min_cells=3)
 adata_ATAC = adata_ATAC.copy()  # Ensure adata_ATAC is not a view after filtering
-print(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[0]} peaks, {adata_ATAC.shape[1]} cells')
+print(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
 print('\nShape of the dataset after filtering')
-print(f'\tscRNAseq Dataset: {adata_RNA.shape[0]} genes, {adata_RNA.shape[1]} cells')
-print(f'\tscATACseq Dataset: {adata_ATAC.shape[0]} peaks, {adata_ATAC.shape[1]} cells')
+print(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
+print(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
 print(f'\nCombining RNA and ATAC seq barcodes')
 # Create a list of barcodes that match both the RNA-seq and ATAC-seq data
