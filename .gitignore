@@ -2,3 +2,5 @@
 *.gexf
 *.csv
 *.tsv
+*.err
+*.pyc

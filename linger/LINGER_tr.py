@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from sklearn.model_selection import KFold
 import numpy as np
 import pandas as pd
 from torch.optim import Adam
@@ -199,81 +200,136 @@ def sc_nn_cpu(ii: int, gene_chr: pd.DataFrame, TFindex: list[str], TFindex_bulk:
             - float: Placeholder value (0.5).
             - int: Placeholder value (1).
             - np.ndarray: Array of loss values during the training process.
-
-    Comments:
-        - This function processes a single gene and its associated TFs and REs for scNN computation.
-        - If regulatory element indices are valid, the function constructs input matrices for both TFs and REs.
-        - A neural network is trained with L1 regularization, Fisher regularization, and Laplacian regularization.
-        - The function returns the trained network, Shapley values for interpretation, and loss metrics.
     """
-
-    # Set up warnings and constants
-    warnings.filterwarnings("ignore")
-    alpha = torch.tensor(1.0, dtype=torch.float32)
-    eps = 1e-12  # small value to prevent division by zero
-    
-    # Extract gene and TF indices for single-cell and bulk data
-    gene_idx = gene_chr['id_s'].values[ii] - 1
-    gene_idx_b = int(gene_chr['id_b'].values[ii]) - 1
-    TFidxtemp = [int(k) + 1 for k in TFindex[gene_idx].split('_')]
-    TFidxtemp_b = [int(k) for k in TFindex_bulk[gene_idx_b].split('_')]
-    TFtemp = Exp[np.array(TFidxtemp) - 1, :]  # TF expression data
-
-    # Extract RE indices for single-cell and bulk data
-    REidxtemp = [int(k) + 1 for k in REindex[gene_idx].split('_')] if 'nan' not in REindex[gene_idx] else []
-    REidxtemp_b_m = [int(k) + 1 for k in REindex_bulk_match[gene_idx].split('_')] if 'nan' not in REindex_bulk_match[gene_idx] else []
-    
-    # If no valid REs are found, construct an empty input matrix with only TF data
-    if not REidxtemp:
-        inputs = TFtemp
-        L = torch.zeros((len(TFidxtemp), len(TFidxtemp)), dtype=torch.float32)  # Laplacian matrix
+    alpha = 1
+    eps=1e-12
+    alpha = torch.tensor(alpha,dtype=torch.float32)
+    gene_idx=gene_chr['id_s'].values[ii]-1
+    gene_idx_b=int(gene_chr['id_b'].values[ii])-1
+    TFidxtemp=TFindex[gene_idx]
+    TFidxtemp=TFidxtemp.split('_')
+    TFidxtemp=[int(TFidxtemp[k])+1 for k in range(len(TFidxtemp))]
+    TFidxtemp_b=TFindex_bulk[gene_idx_b]
+    TFidxtemp_b=TFidxtemp_b.split('_')
+    TFidxtemp_b=[int(TFidxtemp_b[k]) for k in range(len(TFidxtemp_b))]
+    TFtemp=Exp[np.array(TFidxtemp)-1,:]
+    REidxtemp=REindex[gene_idx]
+    REidxtemp_b_m=REindex_bulk_match[gene_idx]
+    REidxtemp_b=REindex_bulk[gene_idx_b]
+    REidxtemp=str(REidxtemp).split('_')
+    REidxtemp_b_m=str(REidxtemp_b_m).split('_')
+    REidxtemp_b=str(REidxtemp_b).split('_')
+    if (len(REidxtemp)==1)&(REidxtemp[0]=='nan'):
+        REidxtemp=[]
+        REidxtemp_b_m=[]
+        inputs=TFtemp+1-1
+        L=np.zeros([len(TFidxtemp)+len(REidxtemp),len(TFidxtemp)+len(REidxtemp)])
+        L=torch.tensor(L, dtype=torch.float32)
     else:
-        # Otherwise, include RE data in the input
-        REtemp = Opn[np.array(REidxtemp) - 1, :]
-        inputs = np.vstack((TFtemp, REtemp))
-        
-        # Build adjacency matrix for RE-TF connections
-        adj_matrix = np.zeros((len(TFidxtemp) + len(REidxtemp), len(TFidxtemp) + len(REidxtemp)))
-        adj_matrix[:len(TFidxtemp), -len(REidxtemp):] = adj_matrix_all[np.array(REidxtemp) - 1, :][:, np.array(TFidxtemp) - 1].T
-        adj_matrix[-len(REidxtemp):, :len(TFidxtemp)] = adj_matrix_all[np.array(REidxtemp) - 1, :][:, np.array(TFidxtemp) - 1]
-        
-        A = torch.tensor(adj_matrix, dtype=torch.float32)  # Adjacency matrix
-        D = torch.diag(A.sum(1))  # Degree matrix
-        degree = A.sum(dim=1) + eps
-        D_sqrt_inv = torch.diag(1 / degree.sqrt())
-        L = D_sqrt_inv @ (D - A) @ D_sqrt_inv  # Laplacian matrix
-
-    # Prepare targets and inputs for the neural network
-    targets = torch.tensor(Target[gene_idx, :], dtype=torch.float32)
-    inputs = torch.tensor((inputs.T - inputs.mean(axis=1)) / (inputs.std(axis=1) + eps), dtype=torch.float32).T
-
-    # Load pre-trained network and set up Fisher matrix
-    loaded_net = Net(int(input_size_all[gene_idx_b]), activef)
+        REidxtemp=[int(REidxtemp[k])+1 for k in range(len(REidxtemp))]
+        REidxtemp_b_m=[int(REidxtemp_b_m[k])+1 for k in range(len(REidxtemp_b_m))]
+        REtemp=Opn[np.array(REidxtemp)-1,:]
+        inputs=np.vstack((TFtemp, REtemp))
+        adj_matrix=np.zeros([len(TFidxtemp)+len(REidxtemp),len(TFidxtemp)+len(REidxtemp)])
+        AA=adj_matrix_all[np.array(REidxtemp)-1,:]
+        AA=AA[:,np.array(TFidxtemp)-1]
+        adj_matrix[:len(TFidxtemp),-len(REidxtemp):]=AA.T
+        adj_matrix[-len(REidxtemp):,:len(TFidxtemp)]=AA
+        A = torch.tensor(adj_matrix, dtype=torch.float32)
+        D = torch.diag(A.sum(1))
+        degree = A.sum(dim=1)
+        degree += eps
+        D_sqrt_inv = 1 / degree.sqrt()
+        D_sqrt_inv = torch.diag(D_sqrt_inv)
+        L = D_sqrt_inv@(D - A)@D_sqrt_inv
+    if (len(REidxtemp_b)==1)&(REidxtemp_b[0]=='nan'):
+        REidxtemp_b=[]
+    else:
+        REidxtemp_b=[int(REidxtemp_b[k]) for k in range(len(REidxtemp_b))]
+    targets = torch.tensor(Target[gene_idx,:])
+    inputs = torch.tensor(inputs,dtype=torch.float32)
+    targets = targets.type(torch.float32)
+    mean = inputs.mean(dim=1)
+    std = inputs.std(dim=1)
+    inputs = (inputs.T - mean) / (std+eps)
+    inputs=inputs.T
+    num_nodes=inputs.shape[0]
+    y=targets.reshape(len(targets),1)     
+    #trainData testData          
+    input_size=int(input_size_all[gene_idx_b])
+    loaded_net = Net(input_size, activef)
     loaded_net.load_state_dict(netall[gene_idx_b])
-    fisher0 = fisherall[gene_idx_b][0].data.clone()
-
-    # Train the network and calculate Shapley values
-    if REidxtemp and REidxtemp_b_m:
-        fisher = fisher0[:, np.array(merge_TF['id_b'].values.tolist() + merge_RE['id_b'].values.tolist(), dtype=int)]
-        params_bulk = params[0][:, np.array(indexall, dtype=int)].detach()
-        
-        # Training loop for the neural network
-        optimizer = Adam(net.parameters(), lr=0.01, weight_decay=l1_lambda)
+    params = list(loaded_net.parameters())
+    fisher0=fisherall[gene_idx_b][0].data.clone()
+    data0=pd.DataFrame(TFidxtemp)
+    data1=pd.DataFrame(TFidxtemp_b)
+    data0.columns=['TF']
+    data1.columns=['TF']
+    A=TF_match.loc[data0['TF'].values-1]['id_b']
+    data0=pd.DataFrame(A)
+    data0.columns=['TF']
+    data1['id_b']=data1.index
+    data0['id_s']=range(0,len(A))
+    merge_TF=pd.merge(data0,data1,how='left',on='TF')
+    if (len(REidxtemp)>0)&(len(REidxtemp_b)>0):
+        data0=pd.DataFrame(REidxtemp_b_m)
+        data1=pd.DataFrame(REidxtemp_b)
+        data0.columns=['RE']
+        data1.columns=['RE']
+        data0['id_s']=data0.index
+        data1['id_b']=data1.index
+        merge_RE=pd.merge(data0,data1,how='left',on='RE')
+        if merge_RE['id_b'].isna().sum()==0:
+            good=1
+            indexall=merge_TF['id_b'].values.tolist()+(merge_RE['id_b'].values+merge_TF.shape[0]).tolist()
+        else: 
+            good=0
+    else:
+        indexall=merge_TF['id_b'].values.tolist()
+        good=1
+    if good==1:      
+        fisher=fisher0[:,np.array(indexall,dtype=int)]
+        params_bulk = params[0][:,np.array(indexall,dtype=int)]
+        with torch.no_grad():
+            params_bulk = params_bulk.detach()     
+        num_nodes=inputs.shape[0]
+        n_folds = 5
+        kf = KFold(n_splits=n_folds,shuffle=True,random_state=0)
+        fold_size = len(inputs.T) // n_folds
+        input_size = num_nodes
+        mse_loss = nn.MSELoss()
+        y_pred_all=0*(y+1-1)
+        y_pred_all1=0*(y+1-1)
+        y_pred_all1=y_pred_all1.numpy().reshape(-1)
+        X_tr = inputs.T
+        y_tr = y
+        torch.manual_seed(seed_value)
+        net = Net(input_size, activef)
+        optimizer = Adam(net.parameters(),lr=0.01,weight_decay=l1_lambda)   
+            #optimizer = Adam(net.parameters(),weight_decay=1)
+            # Perform backpropagation
+        Loss0=np.zeros([100,1])
         for i in range(100):
-            y_pred = net(inputs.T)
-            loss = mse_loss(y_pred, targets) + l1_norm*l1_lambda + fisher_w * torch.linalg.norm(params_bulk, 1)
+            # Perform forward pass
+            y_pred = net(X_tr)
+            # Calculate loss
+            l1_norm = sum(torch.linalg.norm(p, 1) for p in net.parameters())
+            #loss_EWC=EWC(fisher,params_bulk,net);
+            l2_bulk = -1* fisher_w*  sum(sum(torch.mul(params_bulk,net.fc1.weight)))
+            lap_reg = alpha * torch.trace(torch.mm(torch.mm(net.fc1.weight, L), net.fc1.weight.t()))
+            loss = mse_loss(y_pred, y_tr) +l1_norm*l1_lambda+l2_bulk+lap_reg 
+            Loss0[i,0]=loss.detach().numpy()
+            # Perform backpropagation
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        
-        # Calculate Shapley values
-        background = inputs.T[np.random.choice(inputs.T.shape[0], 50, replace=False)]
-        explainer = shap.DeepExplainer(net, background)
-        shap_values = explainer.shap_values(inputs.T)
-
-        return net, shap_values, 0.5, 0.5, 1, Loss0
+        np.random.seed(42)
+        background = X_tr[np.random.choice(X_tr.shape[0], 50, replace=False)]
+        explainer = shap.DeepExplainer(net,background)
+        shap_values = explainer.shap_values(X_tr)
+        return net,shap_values,0.5,0.5,1,Loss0
     else:
-        return 0, 0, 0, 0, 0, 0
+        return 0,0,0,0,0,0
 
 
 def sc_nn_gpu(ii: int, gene_chr: pd.DataFrame, TFindex: list[str], TFindex_bulk: list[str], REindex: list[str], 
