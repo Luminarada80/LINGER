@@ -9,7 +9,7 @@ import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
 CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
-OUTPUT_DIR = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
+OUTPUT_DIR = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/data'
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
@@ -87,7 +87,7 @@ def plot_cell_expression_histogram(dataset, cell_type):
     
     plt.title(f'Percentage of cells by number of genes expressed in {cell_type}s')
     plt.ylim((0, 20))
-    plt.xlim((0, 5000))
+    plt.xlim((0, 8000))
     plt.xlabel(f'Number of genes expressed ({dataset.shape[1]} total genes)')
     max_percentage = 20
     plt.yticks(np.arange(0, max_percentage + 1, 5), [f'{i}%' for i in range(0, max_percentage + 1, 5)])
