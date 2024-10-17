@@ -4,4 +4,6 @@
 *.tsv
 *.err
 *.pyc
+*.bed
+*.h5ad
 /data/*
