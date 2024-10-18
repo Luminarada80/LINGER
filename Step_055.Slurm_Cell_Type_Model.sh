@@ -10,7 +10,7 @@
 
 source /gpfs/Home/esm5360/.bashrc
 
-conda activate LINGER
+conda activate LINGER_1.92
 
 cd /gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/
 
