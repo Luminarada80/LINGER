@@ -9,4 +9,5 @@
 *.seq
 *.pos
 *.temp
+*.find.tmp
 /data/*
