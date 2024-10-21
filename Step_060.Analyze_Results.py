@@ -22,9 +22,9 @@ CELL_TYPE = 'mESC' # H1
 TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
 CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
 TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/46177_gene_score_5fold.txt'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/data/filtered_ground_truth_56TFs_3036TGs.csv'
 
-RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
+RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS'
 
 def load_data():
     """Load transcription factor (TF), cis-regulatory, and trans-regulatory network data."""
@@ -32,13 +32,24 @@ def load_data():
     tf_re_binding = pd.read_csv(TF_RE_BINDING_PATH, sep='\t', index_col=0)
     cis_reg_network = pd.read_csv(CIS_REG_NETWORK_PATH, sep='\t', index_col=0)
     trans_reg_network = pd.read_csv(TRANS_REG_NETWORK_PATH, sep='\t', index_col=0)
+
+    # Ensure the headers (column names) are in uppercase
+    tf_re_binding.columns = tf_re_binding.columns.str.upper()
+    cis_reg_network.columns = cis_reg_network.columns.str.upper()
+    trans_reg_network.columns = trans_reg_network.columns.str.upper()
+
+    # Ensure the row names are in uppercase
+    tf_re_binding.index = tf_re_binding.index.str.upper()
+    cis_reg_network.index = cis_reg_network.index.str.upper()
+    trans_reg_network.index = trans_reg_network.index.str.upper()
+
     return tf_re_binding, cis_reg_network, trans_reg_network
 
 
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep='\t', header=None)
+    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=',', header=[0], index_col=[0])
     return ground_truth
 
 
@@ -243,6 +254,10 @@ def main():
     """Main function to run the analysis of the LINGER output"""
 
     # ----- DATA LOADING -----
+
+    if not os.path.exists(RESULT_DIR):
+        os.makedirs(RESULT_DIR, exist_ok=True)
+
     tf_re_binding, cis_reg_network, trans_reg_network = load_data()
     ground_truth = load_ground_truth()
 
@@ -301,7 +316,23 @@ def main():
         for i in missing_tfs:
             logging.info(i)
 
-    trans_reg_minus_ground_truth_df = np.setdiff1d(trans_reg_network, ground_truth_df)
+     # Reset index so the TGs become a column
+    trans_reg_network.reset_index(inplace=True)
+
+    # Melt the TRP dataset to have it in the same format as the ground truth
+    trans_reg_net_melted = pd.melt(trans_reg_network, id_vars=['index'], var_name='TF', value_name='Score')
+
+    # Add the column header for TGs
+    trans_reg_net_melted.rename(columns={'index': 'TG'}, inplace=True)
+
+    # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
+    difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
+
+    # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
+    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
+
+    # Keep only the relevant columns and rename for consistency
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
 
 
     # ----- FIGURES -----
