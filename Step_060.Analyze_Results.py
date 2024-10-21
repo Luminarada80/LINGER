@@ -75,7 +75,7 @@ def save_ground_truth_scores(tf_list: list, tg_list: list, value_list: list):
 
 def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Plots a histogram of all trans-regulatory potential scores compared to the ground truth scores."""
-    linger_scores = trans_reg_network.values.flatten()
+    linger_scores = trans_reg_network['Score'].dropna()
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
     # Handle zeros and small values by adding a small constant (1e-6)
@@ -99,21 +99,30 @@ def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df
 
 def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create box and whisker plots to compare trans-regulatory network scores and ground truth scores."""
-    # Flatten the trans-regulatory network scores
-    trans_reg_scores = trans_reg_network.values.flatten()
-
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_scores > 0, trans_reg_scores, 1e-6)
+    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
     trans_reg_scores = np.log2(trans_reg_scores)
     ground_truth_scores = np.log2(ground_truth_scores)
+    lower_percentile=1
+    upper_percentile=99
+
+    # Remove outliers based on specified percentiles
+    trans_reg_lower = np.percentile(trans_reg_scores, lower_percentile)
+    trans_reg_upper = np.percentile(trans_reg_scores, upper_percentile)
+    ground_truth_lower = np.percentile(ground_truth_scores, lower_percentile)
+    ground_truth_upper = np.percentile(ground_truth_scores, upper_percentile)
+
+    # Filter the data within the percentile range
+    trans_reg_filtered = trans_reg_scores[(trans_reg_scores >= trans_reg_lower) & (trans_reg_scores <= trans_reg_upper)]
+    ground_truth_filtered = ground_truth_scores[(ground_truth_scores >= ground_truth_lower) & (ground_truth_scores <= ground_truth_upper)]
 
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
-        'Score': np.concatenate([trans_reg_scores, ground_truth_scores]),
-        'Source': ['Trans-Regulatory Network'] * len(trans_reg_scores) + ['Ground Truth'] * len(ground_truth_scores)
+        'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
+        'Source': ['Trans-Regulatory Network'] * len(trans_reg_filtered) + ['Ground Truth'] * len(ground_truth_filtered)
     })
 
     # Plot the box and whisker plot
@@ -123,18 +132,16 @@ def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFr
     plt.xlabel('')
     plt.title('Box and Whisker Plot of Trans-Regulatory Network vs Ground Truth Scores')
     plt.tight_layout()
-    plt.savefig(f'{RESULT_DIR}/trans_reg_box_whisker_plot.png', dpi=300)
+    plt.savefig(f'{RESULT_DIR}/trans_reg_box_whisker_plot_no_outliers.png', dpi=300)
     plt.close()
     logging.info("Box and whisker plot saved to 'trans_reg_box_whisker_plot.png'.")
 
 
 def plot_violin(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create violin plots to compare trans-regulatory network scores and ground truth scores."""
-    # Flatten the trans-regulatory network scores
-    trans_reg_scores = trans_reg_network.values.flatten()
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_scores > 0, trans_reg_scores, 1e-6)
+    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
@@ -161,11 +168,9 @@ def plot_violin(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
 
 def plot_violin_without_outliers(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame, lower_percentile=1, upper_percentile=99):
     """Create violin plots for trans-regulatory network scores and ground truth scores after removing outliers."""
-    # Flatten the trans-regulatory network scores
-    trans_reg_scores = trans_reg_network.values.flatten()
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_scores > 0, trans_reg_scores, 1e-6)
+    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
@@ -301,19 +306,36 @@ def main():
         for i in missing_tfs:
             logging.info(i)
 
+    # Reset index so the TGs become a column
+    trans_reg_network.reset_index(inplace=True)
+
+    # Melt the TRP dataset to have it in the same format as the ground truth
+    trans_reg_net_melted = pd.melt(trans_reg_network, id_vars=['index'], var_name='TF', value_name='Score')
+
+    # Add the column header for TGs
+    trans_reg_net_melted.rename(columns={'index': 'TG'}, inplace=True)
+
+    # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
+    difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
+
+    # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
+    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
+
+    # Keep only the relevant columns and rename for consistency
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
 
     # ----- FIGURES -----
     # Histogram distribution of trans-regulatory potential scores and ground truth scores
-    plot_trans_reg_distribution(trans_reg_network, ground_truth_df)
+    plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
-    plot_box_whisker(trans_reg_network, ground_truth_df)
+    plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
-    plot_violin(trans_reg_network, ground_truth_df)
+    plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Violin plot with outliers removed
-    plot_violin_without_outliers(trans_reg_network, ground_truth_df)
+    plot_violin_without_outliers(trans_reg_minus_ground_truth_df, ground_truth_df)
 
 
     # ----- NETWORKX NETWORK -----
