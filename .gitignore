@@ -6,4 +6,6 @@
 *.pyc
 *.bed
 *.h5ad
+*.tmp
+*.png
 ./data/*
