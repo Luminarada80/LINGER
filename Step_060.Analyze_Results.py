@@ -12,17 +12,17 @@ import shared_variables
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-CELL_TYPE = 'classical monocytes' # H1
+CELL_TYPE = 'mESC' # H1
 
 # Define constants for file paths
 # TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_population_TF_RE_binding.txt'
 # CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_cis_regulatory.txt'
 # TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_trans_regulatory.txt'
 
-TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_classical monocytes.txt'
-CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_classical monocytes.txt'
-TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_classical monocytes.txt'
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/PBMC_cistrome_ground_truth.csv'
+TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/46177_gene_score_5fold.txt'
 
 RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
 
@@ -38,7 +38,7 @@ def load_data():
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
+    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep='\t', header=None)
     return ground_truth
 
 
@@ -301,19 +301,21 @@ def main():
         for i in missing_tfs:
             logging.info(i)
 
+    trans_reg_minus_ground_truth_df = np.setdiff1d(trans_reg_network, ground_truth_df)
+
 
     # ----- FIGURES -----
     # Histogram distribution of trans-regulatory potential scores and ground truth scores
-    plot_trans_reg_distribution(trans_reg_network, ground_truth_df)
+    plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
-    plot_box_whisker(trans_reg_network, ground_truth_df)
+    plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
-    plot_violin(trans_reg_network, ground_truth_df)
+    plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Violin plot with outliers removed
-    plot_violin_without_outliers(trans_reg_network, ground_truth_df)
+    plot_violin_without_outliers(trans_reg_minus_ground_truth_df, ground_truth_df)
 
 
     # ----- NETWORKX NETWORK -----
