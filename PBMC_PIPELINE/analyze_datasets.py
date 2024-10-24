@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 
-import shared_variables
+import PBMC_PIPELINE.shared_variables as shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
 CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'

@@ -2,7 +2,7 @@ import pandas as pd
 
 from linger.preprocess import *
 
-import shared_variables
+import PBMC_PIPELINE.shared_variables as shared_variables
 
 # Read in the pseudobulk data and the peak file
 print('Reading in pseudobulk and peak files')

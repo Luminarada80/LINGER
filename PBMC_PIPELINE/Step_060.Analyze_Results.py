@@ -7,7 +7,7 @@ import logging
 import os
 
 from linger import Benchmk
-import shared_variables
+import PBMC_PIPELINE.shared_variables as shared_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
