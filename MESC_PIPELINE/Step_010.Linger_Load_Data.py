@@ -6,7 +6,7 @@ from linger.preprocess import *
 from linger.pseudo_bulk import *
 import warnings
 
-import shared_variables
+import MESC_PIPELINE.shared_variables as shared_variables
 
 # Filter warnings about copying objects from AnnData
 warnings.filterwarnings("ignore", message="Received a view of an AnnData. Making a copy.")

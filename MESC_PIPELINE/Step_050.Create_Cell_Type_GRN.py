@@ -3,7 +3,7 @@ import LingerGRN.LL_net as LL_net
 import subprocess
 import pandas as pd
 
-import shared_variables
+import MESC_PIPELINE.shared_variables as shared_variables
 
 # Load in the adata_RNA and adata_ATAC files
 print(f'Reading in the RNAseq and ATACseq h5ad adata')

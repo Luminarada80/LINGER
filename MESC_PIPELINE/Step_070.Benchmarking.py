@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from linger import Benchmk
-import shared_variables
+import MESC_PIPELINE.shared_variables as shared_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')

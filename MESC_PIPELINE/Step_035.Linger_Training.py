@@ -1,5 +1,5 @@
 import linger.LINGER_tr as LINGER_tr
-import shared_variables
+import MESC_PIPELINE.shared_variables as shared_variables
 
 # Refines the bulk model by further training it on the single-cell data
 print(f'\nBeginning LINGER single cell training...')

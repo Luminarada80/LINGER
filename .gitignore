@@ -24,3 +24,6 @@ staging/
 renv.lock
 renv/*
 grep
+*.rds
+/.idea/*
+*.pdf

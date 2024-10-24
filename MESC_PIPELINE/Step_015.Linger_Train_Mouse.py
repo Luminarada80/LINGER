@@ -2,7 +2,7 @@ import pandas as pd
 import LingerGRN.LINGER_tr as LINGER_tr
 import linger.LINGER_tr as my_linger_tr
 
-import shared_variables
+import MESC_PIPELINE.shared_variables as shared_variables
 
 GRNdir = shared_variables.tss_motif_info_path# This directory should be the same as Datadir defined in the above 'Download the general gene regulatory network' section
 genome = shared_variables.genome
