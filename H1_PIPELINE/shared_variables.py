@@ -1,13 +1,13 @@
 # Main paths
 uzun_lab_dir: str = '/gpfs/Labs/Uzun'
-data_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_SC_DATA'
-ground_truth_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME'
+data_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_H1_SC_DATA'
+ground_truth_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_H1_CISTROME'
 
 # PBMC file paths
-matrix_path: str = f'{data_dir}/pbmc_matrix.mtx'
-features_path: str = f'{data_dir}/pbmc_features.tsv'
-barcodes_path: str = f'{data_dir}/pbmc_barcodes.tsv'
-label_path: str = f'{data_dir}/PBMC_label.txt'
+# matrix_path: str = f'{data_dir}/pbmc_matrix.mtx'
+# features_path: str = f'{data_dir}/pbmc_features.tsv'
+# barcodes_path: str = f'{data_dir}/pbmc_barcodes.tsv'
+label_path: str = f'{data_dir}/H1_label.txt'
 
 # H1 file paths
 
@@ -30,5 +30,7 @@ output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/L
 # Decide which method to use (scNN or LINGER)
 genome: str ='hg38'
 method: str = 'LINGER'
-celltype: str = 'all'
+celltype: str = '0'
 activef: str = 'ReLU' # Neural Network activation function. Choose from: 'ReLU','sigmoid','tanh'
+
+

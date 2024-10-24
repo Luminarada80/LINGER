@@ -1,12 +1,12 @@
 import os
 import scanpy as sc
-import scipy
+from scipy.sparse import csc_matrix
 import pandas as pd
 from linger.preprocess import *
 from linger.pseudo_bulk import *
 import warnings
 
-import PBMC_PIPELINE.shared_variables as shared_variables
+import shared_variables
 
 # Filter warnings about copying objects from AnnData
 warnings.filterwarnings("ignore", message="Received a view of an AnnData. Making a copy.")
@@ -18,10 +18,22 @@ method='LINGER'
 # ----- THIS PART DIFFERS BETWEEN PBMC AND H1 -----
 print('\tReading in cell labels...')
 # Read in the data files
-matrix=scipy.io.mmread(shared_variables.matrix_path)
-features=pd.read_csv(shared_variables.features_path,sep='\t',header=None)
-barcodes=pd.read_csv(shared_variables.barcodes_path,sep='\t',header=None)
-label=pd.read_csv(shared_variables.label_path,sep='\t',header=0)
+RNA: pd.DataFrame = pd.read_csv(f'{shared_variables.data_dir}/H1_RNA.txt',sep='\t',header=0,index_col=0)
+ATAC: pd.DataFrame = pd.read_csv(f'{shared_variables.data_dir}/H1_ATAC.txt',sep='\t',header=0,index_col=0)
+label: pd.DataFrame = pd.read_csv(shared_variables.label_path, sep='\t', header=0, index_col=None)
+
+# Combine the scRNA-seq and scATAC-seq datasets by their row index
+matrix: csc_matrix = csc_matrix(pd.concat([RNA,ATAC], axis=0).values)
+features: pd.DataFrame = pd.DataFrame(RNA.index.tolist() + ATAC.index.tolist(), columns=[1])
+
+# Specify the source of the data as either Gene Expression or Peaks
+num_rna_rows = RNA.shape[0]
+num_atac_rows = num_rna_rows + ATAC.shape[0]
+data_types = ['Gene Expression' if i <= num_rna_rows else 'Peaks' for i in range(0, num_atac_rows)]
+features[2] = data_types
+
+# Specify the barcodes as the column 0 values
+barcodes=pd.DataFrame(RNA.columns.values, columns=[0])
 # ---------------------------------------------------
 
 print('\nExtracting the adata RNA and ATAC seq data...')

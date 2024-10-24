@@ -51,6 +51,7 @@ def plot_roc_curve(tf_name: str, cell_types: list[str], predicted_interactions: 
             predicted_target_genes = predicted_data['TG'].values[tf_indices].tolist()
             target_gene_set = predicted_target_genes.copy()
             predicted_scores = predicted_data['score'].values[tf_indices]
+            
         elif data_type == 'matrix':
             predicted_data: pd.DataFrame = pd.read_csv(predicted_file, sep='\t', header=0, index_col=0)
             target_gene_set = predicted_data.index
