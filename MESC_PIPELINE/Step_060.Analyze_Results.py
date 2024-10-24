@@ -86,7 +86,7 @@ def save_ground_truth_scores(tf_list: list, tg_list: list, value_list: list):
 
 def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Plots a histogram of all trans-regulatory potential scores compared to the ground truth scores."""
-    linger_scores = trans_reg_network.values.flatten()
+    linger_scores = trans_reg_network['Score'].dropna()
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
     # Handle zeros and small values by adding a small constant (1e-6)
@@ -110,11 +110,8 @@ def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df
 
 def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create box and whisker plots to compare trans-regulatory network scores and ground truth scores."""
-    # Flatten the trans-regulatory network scores
-    trans_reg_scores = trans_reg_network.values.flatten()
-
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_scores > 0, trans_reg_scores, 1e-6)
+    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
