@@ -41,15 +41,14 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if not args.cell_pop:
+    # Default to cell population if no arguments passed
+    if not args.cell_pop and args.cell_type is None:
+        logging.warning("\n\nWarning! no arguments specified. Defaulting to running cell pop analysis\n")
+        args.cell_pop = True
 
-        # Check for error condition: CELL_POP is False and CELL_TYPE is None
-        if args.cell_type is None:
-            parser.error("--cell_type must be specified when --cell_pop is set to False")
-    
-        # Check to make sure the entered cell type is in CELL_TYPE_TF_DICT
-        if not args.cell_type in CELL_TYPE_TF_DICT.keys():
-            parser.error(f"\n\n--cell_type not found in the CELL_TYPE_TF_DICT: \n\n{CELL_TYPE_TF_DICT.keys()}")
+    # Check to make sure the entered cell type is in CELL_TYPE_TF_DICT
+    if not args.cell_pop and not args.cell_type in CELL_TYPE_TF_DICT.keys():
+        parser.error(f"\n\n--cell_type not found in the CELL_TYPE_TF_DICT: \n\n{CELL_TYPE_TF_DICT.keys()}")
     
     return args
 
