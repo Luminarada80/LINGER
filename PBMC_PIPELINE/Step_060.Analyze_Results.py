@@ -6,60 +6,143 @@ import numpy as np
 import logging
 import os
 import sys
+import argparse
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger import Benchmk
 import PBMC_PIPELINE.shared_variables as shared_variables
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-
-CELL_TYPE = 'classical monocytes' # H1
-
-# Define constants for file paths
-# TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_population_TF_RE_binding.txt'
-# CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_cis_regulatory.txt'
-# TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_population_trans_regulatory.txt'
-
-TF_RE_BINDING_PATH = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_classical monocytes.txt'
-CIS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_classical monocytes.txt'
-TRANS_REG_NETWORK_PATH = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_classical monocytes.txt'
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/PBMC_cistrome_ground_truth.csv'
-
+# ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
+CHIP_SEQ_GROUND_TRUTH_PATH: str = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_CISTROME/PBMC_cistrome_ground_truth.csv'
 RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS'
+
+CELL_TYPE_TF_DICT: dict = {
+    'classical monocytes': {'CTCF', 'IRF1', 'RUNX1', 'SPI1', 'STAT1'},
+    'naive B cells': {'CTCF', 'IRF4', 'MYC'},
+    'naive CD4 T cells': {'ETS1', 'FOXP3', 'REST', 'RUNX1'},
+    'myeloid DC': {'RUNX1'}
+}
+# ----------------------------------------------------------------
+
+# Allows the user to input whether they want to analyze the cell population or cell type results
+def parse_args():
+    parser = argparse.ArgumentParser(description="Process TF-TG pairs with cell type specificity.")
+    parser.add_argument(
+        "--cell_pop",
+        action="store_true",
+        help="Set CELL_POP to True if specified, otherwise False."
+    )
+    parser.add_argument(
+        "--cell_type",
+        type=str,
+        required=False,
+        help="Enter the name of the cell type as it is formatted in the LINGER cell-type specific output directory"
+    )
+
+    args = parser.parse_args()
+
+    if not args.cell_pop:
+
+        # Check for error condition: CELL_POP is False and CELL_TYPE is None
+        if args.cell_type is None:
+            parser.error("--cell_type must be specified when --cell_pop is set to False")
+    
+        # Check to make sure the entered cell type is in CELL_TYPE_TF_DICT
+        if not args.cell_type in CELL_TYPE_TF_DICT.keys():
+            parser.error(f"\n\n--cell_type not found in the CELL_TYPE_TF_DICT: \n\n{CELL_TYPE_TF_DICT.keys()}")
+    
+    return args
+
+# Parse the arguments
+args = parse_args()
+CELL_POP = args.cell_pop  # Default False
+CELL_TYPE = args.cell_type
+
+# Example usage
+print(f'CELL_POP is set to "{CELL_POP}"')
+
+if CELL_POP == False:
+    print(f'CELL_TYPE is set to "{CELL_TYPE}"')
+
+if CELL_POP == True:
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}cell_population_TF_RE_binding.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_population_cis_regulatory.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_population_trans_regulatory.txt'
+
+elif CELL_POP == False:
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+
+else:
+    logging.warning('CELL_POP is not set to boolean "True" or "False"')
+
+# Sets the size of the text in the figures to be consistent
+SMALL_SIZE: int = 8
+MEDIUM_SIZE: int = 10
+BIGGER_SIZE: int = 12
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 def load_data():
     """Load transcription factor (TF), cis-regulatory, and trans-regulatory network data."""
     logging.info("Loading TF-RE binding, cis-regulatory, and trans-regulatory network data.")
-    tf_re_binding = pd.read_csv(TF_RE_BINDING_PATH, sep='\t', index_col=0)
-    cis_reg_network = pd.read_csv(CIS_REG_NETWORK_PATH, sep='\t', index_col=0)
-    trans_reg_network = pd.read_csv(TRANS_REG_NETWORK_PATH, sep='\t', index_col=0)
+    tf_re_binding: pd.DataFrame = pd.read_csv(TF_RE_BINDING_PATH, sep='\t', index_col=0)
+    cis_reg_network: pd.DataFrame = pd.read_csv(CIS_REG_NETWORK_PATH, sep='\t', index_col=0)
+    trans_reg_network: pd.DataFrame = pd.read_csv(TRANS_REG_NETWORK_PATH, sep='\t', index_col=0)
     return tf_re_binding, cis_reg_network, trans_reg_network
 
 
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
+    ground_truth: pd.DataFrame = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
     return ground_truth
 
 
 def process_tf_tg_pairs(ground_truth: pd.DataFrame, trans_reg_network: pd.DataFrame):
-    """Process ground truth TF-TG pairs and retrieve the corresponding scores from the trans-regulatory network."""
+    """Process ground truth TF-TG pairs and retrieve the corresponding scores from the trans-regulatory network.
+       Only considers TF-TG pairs for specified cell type TFs."""
+    
     tf_list, tg_list, value_list = [], [], []
-    num_nan = 0
-    num_rows = 0
+    num_nan: int = 0
+    num_rows: int = 0
 
     for index, row in ground_truth.iterrows():
-        try:
-            # Get the trans-regulatory score for the TF-TG pair
-            value = trans_reg_network.loc[row[1], row[0]]
-            tf_list.append(row[0])
-            tg_list.append(row[1])
-            value_list.append(value)
-        except KeyError:
-            # Handle missing value case
-            num_nan += 1
+        tf, tg = row[0], row[1]
+        
+        # If looking at a cell type, only use TFs specific to that cell type
+        # Check if the TF is in the cell type-specific TF list
+        if CELL_POP == False:
+            if tf in CELL_TYPE_TF_DICT[CELL_TYPE]:
+                try:
+                    # Get the trans-regulatory score for the TF-TG pair
+                    value = trans_reg_network.loc[tg, tf]
+                    tf_list.append(tf)
+                    tg_list.append(tg)
+                    value_list.append(value)
+                except KeyError:
+                    # Handle missing value case
+                    num_nan += 1
+        
+        # If using the cell population, use all TFs
+        else:
+            try:
+                # Get the trans-regulatory score for the TF-TG pair
+                value = trans_reg_network.loc[tg, tf]
+                tf_list.append(tf)
+                tg_list.append(tg)
+                value_list.append(value)
+            except KeyError:
+                # Handle missing value case
+                num_nan += 1
+
         
         num_rows += 1
 
@@ -68,8 +151,10 @@ def process_tf_tg_pairs(ground_truth: pd.DataFrame, trans_reg_network: pd.DataFr
 
 def save_ground_truth_scores(tf_list: list, tg_list: list, value_list: list):
     """Save the processed ground truth TF-TG scores to a CSV file."""
-    ground_truth_scores = {'TF': tf_list, 'TG': tg_list, 'Score': value_list}
-    ground_truth_df = pd.DataFrame(ground_truth_scores)
+    # Convert the lists of TFs, TGs, and Scores to a dataframe
+    ground_truth_df = pd.DataFrame({'TF': tf_list, 'TG': tg_list, 'Score': value_list})
+
+    # Same the processed groudn truth dataframe to a csv file
     ground_truth_df.to_csv(f'{RESULT_DIR}/ground_truth_w_score.csv', header=True, index=False)
     logging.info("\nGround truth scores saved to 'ground_truth_w_score.csv'.")
     return ground_truth_df
@@ -91,13 +176,20 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='True negative (non-ground truth scores)')
     plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='True positive (ground truth scores)')
 
-    plt.title('Distribution of ground truth TRP scores vs non-ground truth TRP scores')
+    
     plt.rc('')
     plt.ylabel('Frequency (log)')
     plt.xlabel('log2 LINGER trans-regulatory potential score')
     plt.legend()
-    plt.tight_layout()
-    plt.savefig(f'{RESULT_DIR}/trans_reg_distribution.png', dpi=300)
+
+    if CELL_POP == True:
+        plt.title(f'Distribution of Cell Population TRP Scores')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution.png', dpi=300)
+    else:
+        plt.title(f'Distribution of TRP Scores in {CELL_TYPE.capitalize()}')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution.png', dpi=300)
     plt.close()
     logging.info("\nTrans-regulatory distribution plot saved to 'trans_reg_distribution.png'.")
 
@@ -127,7 +219,7 @@ def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
-        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive'] * len(ground_truth_filtered)
+        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive (ground truth)'] * len(ground_truth_filtered)
     })
 
     # Plot the box and whisker plot
@@ -135,9 +227,17 @@ def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_
     sns.boxplot(x='Source', y='Score', data=scores_df)
     plt.ylabel('log2 Score')
     plt.xlabel('')
-    plt.title('Box and Whisker Plot of TRP Scores in Classical Monocytes')
+    
     plt.tight_layout()
-    plt.savefig(f'{RESULT_DIR}/trans_reg_box_whisker_plot_no_outliers.png', dpi=300)
+    if CELL_POP == True:
+        plt.title(f'Cell Population TRP Scores (no outliers)')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_box_whisker_plot_no_outliers.png', dpi=300)
+    else:
+        plt.title(f'TRP Scores in {CELL_TYPE.capitalize()} (no outliers)')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_box_whisker_plot_no_outliers.png', dpi=300)
+
     plt.close()
     logging.info("Box and whisker plot saved to 'trans_reg_box_whisker_plot.png'.")
 
@@ -156,7 +256,7 @@ def plot_violin(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_scores, ground_truth_scores]),
-        'Source': ['Trans-Regulatory Network'] * len(trans_reg_scores) + ['Ground Truth'] * len(ground_truth_scores)
+        'Source': ['True Negative'] * len(trans_reg_scores) + ['True Positive (ground truth)'] * len(ground_truth_scores)
     })
 
     # Plot the violin plot
@@ -164,9 +264,16 @@ def plot_violin(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth
     sns.violinplot(x='Source', y='Score', data=scores_df, inner="quartile")
     plt.ylabel('log2 Score')
     plt.xlabel('')
-    plt.title('Violin Plot of Trans-Regulatory Network vs Ground Truth Scores')
-    plt.tight_layout()
-    plt.savefig(f'{RESULT_DIR}/trans_reg_violin_plot.png', dpi=300)
+    
+    if CELL_POP == True:
+        plt.title(f'Cell Population TRP Scores')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_violin_plot.png', dpi=300)
+    else:
+        plt.title(f'{CELL_TYPE.capitalize()} TRP Scores')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_violin_plot.png', dpi=300)
+
     plt.close()
     logging.info("Violin plot saved to 'trans_reg_violin_plot.png'.")
 
@@ -195,7 +302,7 @@ def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFr
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
-        'Source': ['Trans-Regulatory Network'] * len(trans_reg_filtered) + ['Ground Truth'] * len(ground_truth_filtered)
+        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive (ground truth)'] * len(ground_truth_filtered)
     })
 
     # Plot the violin plot without outliers
@@ -203,11 +310,18 @@ def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFr
     sns.violinplot(x='Source', y='Score', data=scores_df, inner="quartile")
     plt.ylabel('log2 Score')
     plt.xlabel('')
-    plt.title(f'Violin Plot of Trans-Regulatory Network vs Ground Truth Scores (No Outliers)')
-    plt.tight_layout()
-    plt.savefig(f'{RESULT_DIR}/trans_reg_violin_plot_no_outliers.png', dpi=300)
+
+    if CELL_POP == True:
+        plt.title(f'Cell Population TRP Scores (no outliers)')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_violin_plot_no_outliers.png', dpi=300)
+    else:
+        plt.title(f'{CELL_TYPE.capitalize()} TRP Scores (no outliers)')
+        plt.tight_layout()
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_violin_plot_no_outliers.png', dpi=300)
+
     plt.close()
-    logging.info("Violin plot without outliers saved to 'trans_reg_violin_plot_no_outliers.png'.")
+    logging.info("Violin plot without outliers saved.")
 
 
 def create_network_graph(ground_truth_df: pd.DataFrame, output_file: str):
@@ -245,12 +359,19 @@ def summarize_ground_truth_and_trans_reg(ground_truth_df: pd.DataFrame, trans_re
     print(summary_stats)
 
     # Save the summary to a csv file
-    summary_stats.to_csv(f'{RESULT_DIR}/summary_statistics.csv')
+    if CELL_POP == True:
+        summary_stats.to_csv(f'{RESULT_DIR}/cell_pop_summary_statistics.csv')
+    else:
+        summary_stats.to_csv(f'{RESULT_DIR}/{CELL_TYPE}/summary_statistics.csv')
+
     logging.info("Summary statistics saved to 'summary_statistics.csv'.")
 
 
 def main():
     """Main function to run the analysis of the LINGER output"""
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
 
     # ----- DATA LOADING -----
     tf_re_binding, cis_reg_network, trans_reg_network = load_data()
@@ -273,6 +394,8 @@ def main():
 
     # Process the TF-TG pairs and retrieve scores from the trans-regulatory network
     tf_list, tg_list, value_list, num_nan = process_tf_tg_pairs(ground_truth, trans_reg_network)
+
+    print(f'TFs: {set(tf_list)}')
 
     # Save the processed ground truth scores
     ground_truth_df = save_ground_truth_scores(tf_list, tg_list, value_list)
