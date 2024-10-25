@@ -25,7 +25,7 @@ peak_file_path: str = f'{data_dir}/Peaks.txt'
 bulk_model_dir: str = f'{data_dir}/../LINGER_BULK_MODEL/'
 
 # Output directory
-output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_H1_TRAINED_MODEL/'
+output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_PBMC_TRAINED_MODEL/'
 
 # Decide which method to use (scNN or LINGER)
 genome: str ='hg38'

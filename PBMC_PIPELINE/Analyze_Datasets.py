@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 
-import PBMC_PIPELINE.shared_variables as shared_variables
+import shared_variables
 
 ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
 CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
@@ -97,7 +97,7 @@ def plot_cell_expression_histogram(dataset, cell_type):
     plt.close()
 
 def find_tf_expression(ground_truth, cell_type):
-    ground_truth_tfs = list(set(ground_truth['TF']))
+    ground_truth_tfs = list(set(ground_truth['TF']))    
 
     # Iterate through the shared genes between the ground truth and the scRNAseq data
     gene_expr_dict = {'gene': [], 'percent_expression': []}

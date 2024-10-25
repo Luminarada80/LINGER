@@ -5,6 +5,8 @@ import networkx as nx
 import numpy as np
 import logging
 import os
+import sys
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger import Benchmk
 import PBMC_PIPELINE.shared_variables as shared_variables
@@ -73,9 +75,12 @@ def save_ground_truth_scores(tf_list: list, tg_list: list, value_list: list):
     return ground_truth_df
 
 
-def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
-    """Plots a histogram of all trans-regulatory potential scores compared to the ground truth scores."""
-    linger_scores = trans_reg_network['Score'].dropna()
+def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame):
+    """
+    Plots a histogram of non-ground truth trans-regulatory potential scores compared to the ground truth scores.
+    """
+
+    linger_scores = trans_reg_network_minus_ground_truth['Score'].dropna()
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
     # Handle zeros and small values by adding a small constant (1e-6)
@@ -83,10 +88,10 @@ def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Plot histograms for the LINGER trans-reg network and ground truth network
-    plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='LINGER trans-reg network')
-    plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='Ground truth network')
+    plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='True negative (non-ground truth scores)')
+    plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='True positive (ground truth scores)')
 
-    plt.title('Trans-regulatory potential scores')
+    plt.title('Distribution of ground truth TRP scores vs non-ground truth TRP scores')
     plt.rc('')
     plt.ylabel('Frequency (log)')
     plt.xlabel('log2 LINGER trans-regulatory potential score')
@@ -97,10 +102,10 @@ def plot_trans_reg_distribution(trans_reg_network: pd.DataFrame, ground_truth_df
     logging.info("\nTrans-regulatory distribution plot saved to 'trans_reg_distribution.png'.")
 
 
-def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
+def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create box and whisker plots to compare trans-regulatory network scores and ground truth scores."""
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
+    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
@@ -122,7 +127,7 @@ def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFr
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
-        'Source': ['Trans-Regulatory Network'] * len(trans_reg_filtered) + ['Ground Truth'] * len(ground_truth_filtered)
+        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive'] * len(ground_truth_filtered)
     })
 
     # Plot the box and whisker plot
@@ -130,18 +135,18 @@ def plot_box_whisker(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFr
     sns.boxplot(x='Source', y='Score', data=scores_df)
     plt.ylabel('log2 Score')
     plt.xlabel('')
-    plt.title('Box and Whisker Plot of Trans-Regulatory Network vs Ground Truth Scores')
+    plt.title('Box and Whisker Plot of TRP Scores in Classical Monocytes')
     plt.tight_layout()
     plt.savefig(f'{RESULT_DIR}/trans_reg_box_whisker_plot_no_outliers.png', dpi=300)
     plt.close()
     logging.info("Box and whisker plot saved to 'trans_reg_box_whisker_plot.png'.")
 
 
-def plot_violin(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
+def plot_violin(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create violin plots to compare trans-regulatory network scores and ground truth scores."""
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
+    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
@@ -166,11 +171,11 @@ def plot_violin(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame):
     logging.info("Violin plot saved to 'trans_reg_violin_plot.png'.")
 
 
-def plot_violin_without_outliers(trans_reg_network: pd.DataFrame, ground_truth_df: pd.DataFrame, lower_percentile=1, upper_percentile=99):
+def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame, lower_percentile=1, upper_percentile=99):
     """Create violin plots for trans-regulatory network scores and ground truth scores after removing outliers."""
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network['Score'] > 0, trans_reg_network['Score'], 1e-6)
+    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
@@ -279,9 +284,28 @@ def main():
     logging.info(f'\nGround truth scores')
     logging.info(ground_truth_df.head())
 
+    # ----- Creating a dataframe of non-ground truth TRP scores (True Negative) -----
+    # Reset index so the TGs become a column
+    trans_reg_network.reset_index(inplace=True)
+
+    # Melt the TRP dataset to have it in the same format as the ground truth
+    trans_reg_net_melted = pd.melt(trans_reg_network, id_vars=['index'], var_name='TF', value_name='Score')
+
+    # Add the column header for TGs
+    trans_reg_net_melted.rename(columns={'index': 'TG'}, inplace=True)
+
+    # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
+    difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
+
+    # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
+    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
+
+    # Keep only the relevant columns and rename for consistency
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
+
     logging.info(f'\n----- Summary Statistics -----')
     # Generating summary statistics for the Score column
-    summarize_ground_truth_and_trans_reg(ground_truth_df, trans_reg_network, decimal_places=2)
+    summarize_ground_truth_and_trans_reg(ground_truth_df, trans_reg_minus_ground_truth_df, decimal_places=2)
 
     # Calculate metrics to see how many of the ground truth TFs, TGs, and pairs are in the full 
     # trans-regulatory potential dataset
@@ -305,24 +329,6 @@ def main():
         logging.info(f'TFs present in ground truth missing in the trans-regulatory network')
         for i in missing_tfs:
             logging.info(i)
-
-    # Reset index so the TGs become a column
-    trans_reg_network.reset_index(inplace=True)
-
-    # Melt the TRP dataset to have it in the same format as the ground truth
-    trans_reg_net_melted = pd.melt(trans_reg_network, id_vars=['index'], var_name='TF', value_name='Score')
-
-    # Add the column header for TGs
-    trans_reg_net_melted.rename(columns={'index': 'TG'}, inplace=True)
-
-    # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
-    difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
-
-    # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
-    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
-
-    # Keep only the relevant columns and rename for consistency
-    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
 
     # ----- FIGURES -----
     # Histogram distribution of trans-regulatory potential scores and ground truth scores
