@@ -7,7 +7,7 @@ import os
 
 import MESC_PIPELINE.shared_variables as shared_variables
 
-ADATA_RNA_PATH = shared_variables.adata_RNA_outpath
+ADATA_RNA_PATH = f'{shared_variables.data_dir}/adata_RNA.h5ad'
 CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
 OUTPUT_DIR = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/data'
 

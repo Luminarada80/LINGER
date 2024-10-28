@@ -317,14 +317,14 @@ def sc_nn_NN(ii,RE_TGlink_temp,Target,Exp,Opn,l1_lambda,activef):
     return net,shap_values,Loss0
     
 
-def load_data_scNN(GRNdir,species,outdir):
+def load_data_scNN(GRNdir,species,outdir,data_dir):
     import pandas as pd
     Match2=pd.read_csv(GRNdir+'Match_TF_motif_'+species+'.txt',header=0,sep='\t')
     TFName = pd.DataFrame(Match2['TF'].unique())
-    Target=pd.read_csv(f'{outdir}TG_pseudobulk.tsv',sep='\t',header=0,index_col=0)
+    Target=pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv',sep='\t',header=0,index_col=0)
     TFlist=list(set(Target.index)&set(TFName[0].values))
     Exp=Target.loc[TFlist]
-    Opn=pd.read_csv(f'{outdir}RE_pseudobulk.tsv',sep='\t',header=0,index_col=0)
+    Opn=pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv',sep='\t',header=0,index_col=0)
     RE_TGlink=pd.read_csv(f'{outdir}RE_gene_distance.txt',sep='\t',header=0)
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()
     geneoverlap=list(set(Target.index)&set(RE_TGlink['gene']))
@@ -333,7 +333,7 @@ def load_data_scNN(GRNdir,species,outdir):
     RE_TGlink=RE_TGlink.reset_index(drop=True)
     return Exp,Opn,Target,RE_TGlink  
 
-def RE_TG_dis(outdir):
+def RE_TG_dis(outdir, data_dir):
     import pandas as pd
     import pybedtools
     import numpy as np
@@ -342,17 +342,17 @@ def RE_TG_dis(outdir):
     current_directory = os.getcwd()
     os.makedirs(outdir, exist_ok=True)
     import pandas as pd
-    peakList=pd.read_csv(f'{outdir}/Peaks.txt',index_col=None,header=None)
+    peakList=pd.read_csv(f'{data_dir}/Peaks.txt',index_col=None,header=None)
     peakList1=[temp.split(':')[0] for temp in peakList[0].values.tolist()]
     peakList2=[temp.split(':')[1].split('-')[0] for temp in peakList[0].values.tolist()]
     peakList3=[temp.split(':')[1].split('-')[1] for temp in peakList[0].values.tolist()]
     peakList['chr']=peakList1
     peakList['start']=peakList2
     peakList['end']=peakList3
-    peakList[['chr','start','end']].to_csv(f'{outdir}Peaks.bed',sep='\t',header=None,index=None)
+    peakList[['chr','start','end']].to_csv(f'{data_dir}/Peaks.bed',sep='\t',header=None,index=None)
     TSS_1M=pd.read_csv(f'{outdir}TSS_extend_1M.txt',sep='\t',header=0)
     TSS_1M.to_csv(f'{outdir}TSS_extend_1M.bed',sep='\t',header=None,index=None)
-    a = pybedtools.example_bedtool(f'{outdir}Peaks.bed')
+    a = pybedtools.example_bedtool(f'{data_dir}/Peaks.bed')
     b = pybedtools.example_bedtool(f'{outdir}TSS_extend_1M.bed')
     a_with_b = a.intersect(b, wa=True,wb=True)
     a_with_b.saveas(outdir+'temp.bed')
@@ -368,7 +368,7 @@ import warnings
 import time
 import pandas as pd
 import numpy as np
-def training(GRNdir,method,outdir,activef,species):
+def training(GRNdir,method,outdir,data_dir,activef,species):
     if method=='LINGER':
         hidden_size  = 64
         hidden_size2 = 16
@@ -441,7 +441,7 @@ def training(GRNdir,method,outdir,activef,species):
         lambda0 = 0.00 #bulk
         fisher_w=0.1
         n_jobs=16
-        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,species,outdir)
+        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,species,outdir,data_dir)
         import warnings
         import time
         from tqdm import tqdm

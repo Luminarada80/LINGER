@@ -334,17 +334,17 @@ def TF_RE_scNN(TFName,geneName,net_all,RE_TGlink,REName):
         result_all=result_all.groupby(['TF', 'RE'])['score'].max().reset_index()
     return result_all
     
-def load_data_scNN(GRNdir,genome, output_dir):
+def load_data_scNN(GRNdir,data_dir,genome, output_dir):
     import pandas as pd
     genome_map=pd.read_csv(GRNdir+'genome_map_homer.txt',sep='\t',header=0)
     genome_map.index=genome_map['genome_short'].values  
     Match2=pd.read_csv(GRNdir+'Match_TF_motif_'+genome_map.loc[genome]['species_ensembl']+'.txt',sep='\t',header=0)    
     TFName = pd.DataFrame(Match2['TF'].unique())
-    Target=pd.read_csv(f'{output_dir}TG_pseudobulk.tsv',sep='\t',header=0,index_col=0)
+    Target=pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv',sep='\t',header=0,index_col=0)
     TFlist=list(set(Target.index)&set(TFName[0].values))
     Exp=Target.loc[TFlist]
-    Opn=pd.read_csv(f'{output_dir}RE_pseudobulk.tsv',sep='\t',header=0,index_col=0)
-    RE_TGlink=pd.read_csv(f'{output_dir}RE_gene_distance.txt',sep='\t',header=0)
+    Opn=pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv',sep='\t',header=0,index_col=0)
+    RE_TGlink=pd.read_csv(f'{output_dir}/RE_gene_distance.txt',sep='\t',header=0)
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()
     geneoverlap=list(set(Target.index)&set(RE_TGlink['gene']))
     RE_TGlink.index=RE_TGlink['gene']
@@ -353,7 +353,7 @@ def load_data_scNN(GRNdir,genome, output_dir):
     return Exp,Opn,Target,RE_TGlink  
     
     
-def TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,method,outdir):
+def TF_RE_binding(GRNdir,data_dir,adata_RNA,adata_ATAC,genome,method,outdir):
     from tqdm import tqdm
     import numpy as np
     import pandas as pd
@@ -383,7 +383,7 @@ def TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,method,outdir):
             mat = mat[TFoverlap]
             result = pd.concat([result, mat], join='outer', axis=0)
     if method=='scNN':
-        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,genome,outdir)
+        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,data_dir,genome,outdir)
         RE_TGlink=pd.read_csv(outdir+'RE_TGlink.txt',sep='\t',header=0)
         RE_TGlink.columns=[0,1,'chr']
         #chrall=[RE_TGlink[0][i][0].split(':')[0] for i in range(RE_TGlink.shape[0])]
@@ -825,7 +825,7 @@ def cis_shap_scNN(chrtemp,outdir,RE_TGlink1,REName,TFName):
     return RE_TG
 
 
-def cis_reg(GRNdir,adata_RNA,adata_ATAC,genome,method,outdir): 
+def cis_reg(GRNdir,data_dir,adata_RNA,adata_ATAC,genome,method,outdir): 
     from tqdm import tqdm
     chrom=['chr'+str(i+1) for i in range(22)]
     chrom.append('chrX')
@@ -843,7 +843,7 @@ def cis_reg(GRNdir,adata_RNA,adata_ATAC,genome,method,outdir):
             temp=cis_shap(chrN,outdir)
             result=pd.concat([result,temp],axis=0,join='outer')
     if method=='scNN':
-        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,genome,outdir)
+        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,data_dir,genome,outdir)
         RE_TGlink=pd.read_csv(outdir+'RE_TGlink.txt',sep='\t',header=0)
         RE_TGlink.columns=[0,1,'chr']
         #chrall=[RE_TGlink[0][i][0].split(':')[0] for i in range(RE_TGlink.shape[0])]
@@ -1069,7 +1069,7 @@ def load_TF_TG( GRNdir, TFset,TGset):
     TF_TG_all=pd.DataFrame(TF_TG_all,index=TGset,columns=TFset)
     return TF_TG_all
 
-def trans_reg(GRNdir,method,outdir,genome):
+def trans_reg(GRNdir,data_dir,method,outdir,genome):
     import ast
     import pandas as pd
     from scipy.sparse import coo_matrix
@@ -1095,7 +1095,7 @@ def trans_reg(GRNdir,method,outdir,genome):
             temp=trans_shap(chrN,outdir)
             S=pd.concat([S,temp],axis=0,join='outer')
     elif method=='scNN':
-        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,genome,outdir)
+        Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,data_dir,genome,outdir)
         RE_TGlink=pd.read_csv(outdir+'RE_TGlink.txt',sep='\t',header=0)
         RE_TGlink.columns=[0,1,'chr']
         #chrall=[RE_TGlink[0][i][0].split(':')[0] for i in range(RE_TGlink.shape[0])]

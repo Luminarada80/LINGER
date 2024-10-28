@@ -9,8 +9,8 @@
 #SBATCH --cpus-per-task 1
 #SBATCH --mem-per-cpu=32G
 
-source /gpfs/Home/esm5360/.bashrc
+source "/gpfs/Home/esm5360/.bashrc"
 
 conda activate LINGER
 
-python3 /gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/Step_035.Linger_Training.py
+python3 "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/Step_035.Linger_Training.py"

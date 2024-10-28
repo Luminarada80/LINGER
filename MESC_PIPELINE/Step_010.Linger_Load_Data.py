@@ -1,6 +1,5 @@
 import os
 import scanpy as sc
-import scipy
 import pandas as pd
 import warnings
 import sys
@@ -16,9 +15,6 @@ import MESC_PIPELINE.shared_variables as shared_variables
 # Filter warnings about copying objects from AnnData
 warnings.filterwarnings("ignore", message="Received a view of an AnnData. Making a copy.")
 warnings.filterwarnings("ignore", message="Trying to modify attribute `.obs` of view, initializing view as actual.")
-
-# Specify the method
-method='LINGER'
 
 # ----- THIS PART DIFFERS BETWEEN DATASETS -----
 print('\tReading in cell labels...')
@@ -119,20 +115,22 @@ if not os.path.exists(f'{shared_variables.data_dir}'):
 
 # Writes out the AnnData objects as h5ad files
 print(f'Writing adata_ATAC.h5ad and adata_RNA.h5ad')
-adata_ATAC.write_h5ad(shared_variables.adata_ATAC_outpath)
-adata_RNA.write_h5ad(shared_variables.adata_RNA_outpath)
+adata_ATAC.write_h5ad(f'{shared_variables.data_dir}/adata_ATAC.h5ad')
+adata_RNA.write_h5ad(f'{shared_variables.data_dir}/adata_RNA.h5ad')
 
 # Change any NaN values to 0
 TG_pseudobulk: pd.DataFrame = TG_pseudobulk.fillna(0)
 RE_pseudobulk: pd.DataFrame = RE_pseudobulk.fillna(0)
 
 print(f'Writing out peak gene ids')
-pd.DataFrame(adata_ATAC.var['gene_ids']).to_csv(shared_variables.peak_gene_id_path, header=None, index=None)
+pd.DataFrame(adata_ATAC.var['gene_ids']).to_csv(f'{shared_variables.data_dir}/Peaks.txt', header=None, index=None)
 
 print(f'Writing out pseudobulk...')
-TG_pseudobulk.to_csv(shared_variables.TG_pseudobulk_path, sep='\t', index=True)
-print(f'\tWrote to "...{shared_variables.TG_pseudobulk_path[-50:]}"')
+TG_pseudobulk_path = f'{shared_variables.data_dir}/TG_pseudobulk.tsv'
+RE_pseudobulk_path = f'{shared_variables.data_dir}/RE_pseudobulk.tsv'
 
+TG_pseudobulk.to_csv(TG_pseudobulk_path, sep='\t', index=True)
+print(f'\tWrote to "...{TG_pseudobulk_path[-50:]}"')
 
-RE_pseudobulk.to_csv(shared_variables.RE_pseudobulk_path, sep='\t', index=True)
-print(f'\tWrote to "...{shared_variables.RE_pseudobulk_path[-50:]}"')
+RE_pseudobulk.to_csv(RE_pseudobulk_path, sep='\t', index=True)
+print(f'\tWrote to "...{RE_pseudobulk_path[-50:]}"')

@@ -906,7 +906,7 @@ def RE_TG_dis(data_dir: str, outdir: str) -> None:
     temp.to_csv(outdir + '/RE_gene_distance.txt', sep='\t', index=None)
 
 
-def training_cpu(GRNdir: str, method: str, outdir: str, activef: str, species: str) -> None:
+def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
     """
     Trains a single-cell neural network (scNN) model using gene regulatory network (GRN) data, applying 
     the LINGER method. The function iterates through each chromosome, processes transcription factors (TFs) 
