@@ -73,6 +73,9 @@ elif CELL_POP == False:
     CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
     TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
 
+    # Make sure that the cell type specific dataset is present
+    os.makedirs(f'{RESULT_DIR}/{CELL_TYPE}', exist_ok=True)
+
 else:
     logging.warning('CELL_POP is not set to boolean "True" or "False"')
 

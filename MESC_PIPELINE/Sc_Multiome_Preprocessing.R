@@ -5,7 +5,7 @@ library(SummarizedExperiment)
 library(SingleCellExperiment)
 library(tidyverse)
 
-data_dir <- '/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/'
+data_dir <- '/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/old_data'
 
 # Load scRNA-seq and scATAC-seq data using correct path
 scRNA_data <- readRDS(paste0(data_dir, '/scRNA.Seurat.rds'))
@@ -88,10 +88,10 @@ view(str(multiomic_data_E7.5_filtered))
 multiomic_data_E7.5_filtered_m20 <- subset(
   multiomic_data_E7.5,
   subset = nFeature_RNA > 1000 &
-    nFeature_RNA < 7500 &
+    nFeature_RNA < 10000 &
     mitochondrial_percent_RNA < 20 &
-    nFeature_ATAC > 1000 &
-    nFeature_ATAC < 30000 &
+    nFeature_ATAC > 2000 &
+    nFeature_ATAC < 40000 &
     TSSEnrichment > 1 &
     FRIP > 0.3)
 
