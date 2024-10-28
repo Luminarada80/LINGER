@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+
 import linger.LINGER_tr as LINGER_tr
 import MESC_PIPELINE.shared_variables as shared_variables
 

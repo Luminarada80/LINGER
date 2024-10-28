@@ -1,4 +1,8 @@
 import pandas as pd
+import sys
+
+# Import the project directory to load the linger module
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger.preprocess import *
 

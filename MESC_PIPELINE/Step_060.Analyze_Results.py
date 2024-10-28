@@ -7,6 +7,8 @@ import logging
 import os
 import argparse
 import sys
+
+# Import the project directory to load the linger module
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger import Benchmk
@@ -18,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
-CHIP_SEQ_GROUND_TRUTH_PATH = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/data/filtered_ground_truth_56TFs_3036TGs.csv'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.output_dir}filtered_ground_truth_56TFs_3036TGs.csv'
 RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS'
 
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line

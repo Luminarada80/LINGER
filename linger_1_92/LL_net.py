@@ -17,6 +17,7 @@ import os
 from sklearn.linear_model import ElasticNet
 from sklearn.datasets import make_regression
 from sklearn.model_selection import KFold
+
 hidden_size  = 64
 hidden_size2 = 16
 output_size = 1
@@ -585,7 +586,7 @@ def load_shap(chr,outdir):
     idx_file=outdir+'index.txt'
     TFName=outdir+'TFName.txt'
     #TFE=Input_dir+'TFexp.txt'
-    REName = f'{outdir}Peaks.txt'
+    REName = f'{shared_variables}Peaks.txt'
 # Open the file in read mode
     with open(REName, "r") as file:
     # Create a CSV reader
@@ -736,12 +737,12 @@ def load_RE_TG_distance(GRNdir,chrN,O_overlap_hg19_u,O_overlap_u,O_overlap,TGove
     return array
 
 
-def load_RE_TG_scNN(outdir):   
+def load_RE_TG_scNN(outdir, data_dir):   
     #print('load prior RE-TG ...')
     from scipy.sparse import coo_matrix
     import pandas as pd
     import numpy as np
-    dis=pd.read_csv(f'{outdir}RE_gene_distance.txt',sep='\t',header=0)
+    dis=pd.read_csv(f'{data_dir}RE_gene_distance.txt',sep='\t',header=0)
     dis['distance']=np.exp(-(0.5+dis['distance']/25000))
     REs=dis['RE'].unique()
     TGs=dis['gene'].unique()

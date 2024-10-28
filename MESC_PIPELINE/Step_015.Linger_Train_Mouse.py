@@ -1,7 +1,10 @@
 import pandas as pd
-import LingerGRN.LINGER_tr as LINGER_tr
-import linger.LINGER_tr as my_linger_tr
+import sys
 
+# Import the project directory to load the linger module
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+
+import linger_1_92.LINGER_tr as LINGER_tr
 import MESC_PIPELINE.shared_variables as shared_variables
 
 GRNdir = shared_variables.tss_motif_info_path# This directory should be the same as Datadir defined in the above 'Download the general gene regulatory network' section

@@ -1,4 +1,8 @@
 import scanpy as sc
+
+import sys
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+
 import LingerGRN.LL_net as LL_net
 
 import MESC_PIPELINE.shared_variables as shared_variables

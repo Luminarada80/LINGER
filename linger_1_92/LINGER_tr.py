@@ -342,7 +342,7 @@ def RE_TG_dis(outdir):
     current_directory = os.getcwd()
     os.makedirs(outdir, exist_ok=True)
     import pandas as pd
-    peakList=pd.read_csv(f'{outdir}Peaks.txt',index_col=None,header=None)
+    peakList=pd.read_csv(f'{outdir}/Peaks.txt',index_col=None,header=None)
     peakList1=[temp.split(':')[0] for temp in peakList[0].values.tolist()]
     peakList2=[temp.split(':')[1].split('-')[0] for temp in peakList[0].values.tolist()]
     peakList3=[temp.split(':')[1].split('-')[1] for temp in peakList[0].values.tolist()]

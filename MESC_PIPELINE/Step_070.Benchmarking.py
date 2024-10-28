@@ -3,6 +3,10 @@ import logging
 import os   
 import matplotlib.pyplot as plt
 import seaborn as sns
+import sys
+
+# Import the project directory to load the linger module
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger import Benchmk
 import MESC_PIPELINE.shared_variables as shared_variables

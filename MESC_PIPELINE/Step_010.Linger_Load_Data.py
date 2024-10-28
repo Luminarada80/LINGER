@@ -2,10 +2,15 @@ import os
 import scanpy as sc
 import scipy
 import pandas as pd
+import warnings
+import sys
+
+# Import the project directory to load the linger module
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+
+
 from linger.preprocess import *
 from linger.pseudo_bulk import *
-import warnings
-
 import MESC_PIPELINE.shared_variables as shared_variables
 
 # Filter warnings about copying objects from AnnData
