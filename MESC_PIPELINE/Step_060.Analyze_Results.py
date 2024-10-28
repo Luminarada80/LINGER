@@ -445,11 +445,17 @@ def main():
     # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
     difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
 
+    logging.info(f'Difference df: \n{difference_df.head()}')
+
     # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
     trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
 
+    logging.info(f'trans_reg_minus_ground_truth_df:\n{trans_reg_minus_ground_truth_df}')
+
     # Keep only the relevant columns and rename for consistency
     trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
+
+    logging.info(f'trans_reg_minus_ground_truth_df (filtered):\n{trans_reg_minus_ground_truth_df}')
 
     logging.info(f'\n----- Summary Statistics -----')
     # Generating summary statistics for the Score column

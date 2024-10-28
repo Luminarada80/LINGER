@@ -392,6 +392,7 @@ def main():
     logging.info(f'\n----- Trans-Regulatory Network -----')
     logging.info(f'Number of TFs (columns): {trans_reg_network.shape[1]}')
     logging.info(f'Number of TGs (rows): {trans_reg_network.shape[0]}')
+    logging.info(f'Number of edges: {trans_reg_network.shape[0] * trans_reg_network.shape[1]}')
     logging.info(trans_reg_network.head())
 
     # Process the TF-TG pairs and retrieve scores from the trans-regulatory network
@@ -403,8 +404,9 @@ def main():
     ground_truth_df = save_ground_truth_scores(tf_list, tg_list, value_list)
 
     logging.info(f'\n----- Ground Truth Network -----')
-    logging.info(f'Number of TF-TG pairs: {ground_truth.shape[0]}')
-    logging.info(ground_truth.head())
+    logging.info(f'Number of TF-TG pairs: {ground_truth_df.shape[0]}')
+    logging.info(f'Number of TFs: {len(set(ground_truth_df["TF"]))}')
+    logging.info(f'Number of TGs: {len(set(ground_truth_df["TG"]))}')
 
     logging.info(f'\nGround truth scores')
     logging.info(ground_truth_df.head())
@@ -422,11 +424,20 @@ def main():
     # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
     difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
 
+    logging.info(f'Difference df: \n{difference_df.head()}')
+
     # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
     trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
 
+    logging.info(f'trans_reg_minus_ground_truth_df:\n{trans_reg_minus_ground_truth_df.head()}')
+
     # Keep only the relevant columns and rename for consistency
     trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
+
+    logging.info(f'trans_reg_minus_ground_truth_df (filtered):\n{trans_reg_minus_ground_truth_df.head()}')
+    print(f'Number of TGs {len(set(trans_reg_minus_ground_truth_df["TG"]))}')
+    print(f'Number of TFs {len(set(trans_reg_minus_ground_truth_df["TF"]))}')
+
 
     logging.info(f'\n----- Summary Statistics -----')
     # Generating summary statistics for the Score column
@@ -456,22 +467,22 @@ def main():
             logging.info(i)
 
     # ----- FIGURES -----
-    # Histogram distribution of trans-regulatory potential scores and ground truth scores
-    plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
+    # # Histogram distribution of trans-regulatory potential scores and ground truth scores
+    # plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
 
-    # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
-    plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
+    # # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
+    # plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
 
-    # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
-    plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
+    # # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
+    # plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
 
-    # Violin plot with outliers removed
-    plot_violin_without_outliers(trans_reg_minus_ground_truth_df, ground_truth_df)
+    # # Violin plot with outliers removed
+    # plot_violin_without_outliers(trans_reg_minus_ground_truth_df, ground_truth_df)
 
 
     # ----- NETWORKX NETWORK -----
     # Create and save the network graph
-    create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
+    # create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
 
 if __name__ == '__main__':
     main()
