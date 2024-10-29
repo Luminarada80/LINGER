@@ -8,6 +8,7 @@ import os
 import argparse
 import sys
 import statistics
+from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 # Import the project directory to load the linger module
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
@@ -22,7 +23,7 @@ CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
 CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.ground_truth_dir}/filtered_ground_truth_56TFs_3036TGs.csv'
-RESULT_DIR: str = shared_variables.output_dir
+RESULT_DIR: str = shared_variables.results_dir
 
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
@@ -194,9 +195,9 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     linger_scores = trans_reg_network_minus_ground_truth['Score'].dropna()
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
-    # Handle zeros and small values by adding a small constant (1e-6)
-    linger_scores = np.where(linger_scores > 0, linger_scores, 1e-6)
-    ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
+    # # Handle zeros and small values by adding a small constant (1e-6)
+    # linger_scores = np.where(linger_scores > 0, linger_scores, 1e-6)
+    # ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Plot histograms for the LINGER trans-reg network and ground truth network
     plt.hist(linger_scores, bins=150, log=True, alpha=0.7, label='Non-ground truth scores')
@@ -392,14 +393,14 @@ def summarize_ground_truth_and_trans_reg(
         log_and_write(file, f'\tMean: {mean_score}, Median: {median_score}, Stdev: {stdev_score}')
 
         if thresholds:
-            above_threshold = df[df['Score'] > thresholds['lower']]
-            below_threshold = df[df['Score'] < thresholds['lower']]
+            above_threshold = df[df['Score'] > thresholds['lower']].copy()
+            below_threshold = df[df['Score'] < thresholds['lower']].copy()
             
             log_and_write(file, f'\tNum scores ABOVE lower 2 stdev of mean: {above_threshold.shape[0]} '
                                  f'({round((above_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
             log_and_write(file, f'\tNum scores BELOW lower 2 stdev from mean: {below_threshold.shape[0]} '
                                  f'({round((below_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
-        log_and_write(file, '')
+
 
     # Calculate threshold information for ground truth scores
     gt_mean = ground_truth_df['Score'].mean()
@@ -408,6 +409,9 @@ def summarize_ground_truth_and_trans_reg(
         'lower': round(gt_mean - 2 * gt_stdev, decimal_places)
     }
 
+    # Ensure result directory exists
+    os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
+    
     with open(summary_file_path, 'w') as summary_file:
         log_and_write(summary_file, '----- Summary Statistics -----')
         log_and_write(summary_file, f'Total number of ground truth edges: {original_ground_truth_df.shape[0]}')
@@ -436,7 +440,71 @@ def summarize_ground_truth_and_trans_reg(
         # Summarize both ground truth and trans-regulatory networks
         summarize_network(ground_truth_df, 'Ground truth TRN', summary_file, decimal_places, thresholds)
         summarize_network(trans_reg_network, 'Non-Ground Truth TRN', summary_file, decimal_places, thresholds)
+        
+def plot_auroc(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame):
+    # Calculate mean and standard deviation of ground truth scores
+    gt_mean = ground_truth_df['Score'].mean()
+    gt_std = ground_truth_df['Score'].std()
 
+    # Define the lower threshold
+    lower_threshold = gt_mean - 2 * gt_std
+
+    # Classify ground truth scores
+    ground_truth_df['true_interaction'] = 1  # All entries in ground_truth_df are true interactions
+    ground_truth_df['predicted_interaction'] = np.where(
+        ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for TP, 0 for FN
+
+    # Count ground truth classifications
+    tp_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 1].shape[0]
+    fn_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 0].shape[0]
+    logging.info(f"\nGround Truth Scores: TP={tp_count}, FN={fn_count}")
+
+    # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
+    trans_reg_minus_ground_truth_df['true_interaction'] = 0  # All entries are non-interactions
+    trans_reg_minus_ground_truth_df['predicted_interaction'] = np.where(
+        trans_reg_minus_ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for FP, 0 for TN
+
+    # Count non-ground truth classifications
+    fp_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 1].shape[0]
+    tn_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 0].shape[0]
+    logging.info(f"Non-Ground Truth Scores: FP={fp_count}, TN={tn_count}")
+
+    # Concatenate dataframes for AUC and further analysis
+    auc_df = pd.concat([ground_truth_df, trans_reg_minus_ground_truth_df])
+
+    # Calculate the confusion matrix to confirm the results programmatically
+    from sklearn.metrics import confusion_matrix
+
+    y_true = auc_df['true_interaction']
+    y_pred = auc_df['predicted_interaction']
+    conf_matrix = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = conf_matrix.ravel()
+
+    logging.info(f'\nTrue Posities: {tp}')
+    logging.info(f'False Posities: {fp}')
+    logging.info(f'True Negatives: {tn}')
+    logging.info(f'False Negatives: {fn}')
+
+    # Calculate ROC Curve and AUC
+    fpr, tpr, thresholds = roc_curve(y_true, auc_df['Score'])
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve for Trans-Regulatory Potential Score Classification')
+    plt.legend(loc="lower right")
+    plt.grid()
+
+    # Save the plot based on CELL_POP and CELL_TYPE
+    save_path = f'{RESULT_DIR}/AUC.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/AUC.png'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    logging.info(f'Saved AUROC to {save_path}')
+
+    plt.close()
 
 
 def main():
@@ -554,6 +622,8 @@ def main():
         ground_truth_df['TG'].isin(shared_tgs)
     ]
 
+
+
     # Generating summary statistics for the Score column
     summarize_ground_truth_and_trans_reg(
         ground_truth,
@@ -561,7 +631,44 @@ def main():
         ground_truth_df,
         trans_reg_minus_ground_truth_df,
         decimal_places=2
-        )
+    )
+
+    plot_auroc(ground_truth_df, trans_reg_minus_ground_truth_df)
+
+    # # Set true_interaction labels for AUROC calculation
+    # ground_truth_true_interaction_df['true_interaction'] = 1
+    # trans_reg_true_interaction_df['true_interaction'] = 0
+
+    # # Concatenate both dataframes for AUROC
+    # auc_df = pd.concat([ground_truth_true_interaction_df, trans_reg_true_interaction_df])
+
+    # # Calculating ROC curve and AUC
+    # logging.info(f'Calculating ROC curve')
+    # fpr, tpr, thresholds = roc_curve(auc_df['true_interaction'], auc_df['Score'])
+    # roc_auc = auc(fpr, tpr)
+
+    # # Plotting the ROC curve
+    # plt.figure(figsize=(8, 6))
+    # plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUC = {roc_auc:.2f})')
+    # plt.plot([0, 1], [0, 1], color='gray', linestyle='--')  # Diagonal line for random guessing
+
+    # # Formatting the plot
+    # plt.xlim([0.0, 1.0])
+    # plt.ylim([0.0, 1.05])
+    # plt.xlabel('False Positive Rate')
+    # plt.ylabel('True Positive Rate')
+    # plt.title('Receiver Operating Characteristic (ROC) Curve')
+    # plt.legend(loc="lower right")
+    # plt.grid()
+
+    # # Save the plot based on CELL_POP and CELL_TYPE
+    # save_path = f'{RESULT_DIR}/AUC.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/AUC.png'
+    # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    # plt.savefig(save_path, dpi=300)
+    # logging.info(f'Saved AUROC to {save_path}')
+
+    # plt.close()
+
 
     # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
     missing_tfs = [tf for tf in set(ground_truth_df["TF"]) if tf not in tf_list]

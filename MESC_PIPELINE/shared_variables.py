@@ -12,6 +12,8 @@ tss_motif_info_path: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.
 # Output directory
 output_dir: str = f'{uzun_lab_dir}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL/'
 
+results_dir: str = f'{uzun_lab_dir}/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS'
+
 # Decide which method to use (scNN or LINGER)
 genome: str ='mm10'
 method: str = 'scNN'
