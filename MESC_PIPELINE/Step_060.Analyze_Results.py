@@ -199,8 +199,8 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Plot histograms for the LINGER trans-reg network and ground truth network
-    plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='True negative (non-ground truth scores)')
-    plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='True positive (ground truth scores)')
+    plt.hist(linger_scores, bins=150, log=True, alpha=0.7, label='Non-ground truth scores')
+    plt.hist(ground_truth_scores, bins=150, log=True, alpha=0.7, label='Ground truth scores')
 
     
     plt.rc('')
@@ -227,8 +227,6 @@ def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
     lower_percentile=1
     upper_percentile=99
 
@@ -276,8 +274,8 @@ def plot_violin(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
+    trans_reg_scores = trans_reg_scores
+    ground_truth_scores = ground_truth_scores
 
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
@@ -312,8 +310,8 @@ def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFr
     ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
 
     # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
+    trans_reg_scores = trans_reg_scores
+    ground_truth_scores = ground_truth_scores
 
     # Remove outliers based on specified percentiles
     trans_reg_lower = np.percentile(trans_reg_scores, lower_percentile)
@@ -540,6 +538,21 @@ def main():
     # Convert the scores to log2
     trans_reg_minus_ground_truth_df['Score'] = np.log2(trans_reg_minus_ground_truth_df['Score'])
     ground_truth_df['Score'] = np.log2(ground_truth_df['Score'])
+
+    # Keep only the TFs and TGs that are shared between the datasets
+    shared_tfs = set(trans_reg_minus_ground_truth_df['TF']).intersection(set(ground_truth_df['TF']))
+    shared_tgs = set(trans_reg_minus_ground_truth_df['TG']).intersection(set(ground_truth_df['TG']))
+
+    # Filter each dataframe to include only the shared TFs and TGs
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df[
+        trans_reg_minus_ground_truth_df['TF'].isin(shared_tfs) & 
+        trans_reg_minus_ground_truth_df['TG'].isin(shared_tgs)
+    ]
+
+    ground_truth_df = ground_truth_df[
+        ground_truth_df['TF'].isin(shared_tfs) & 
+        ground_truth_df['TG'].isin(shared_tgs)
+    ]
 
     # Generating summary statistics for the Score column
     summarize_ground_truth_and_trans_reg(

@@ -522,6 +522,21 @@ def main():
     trans_reg_minus_ground_truth_df['Score'] = np.log2(trans_reg_minus_ground_truth_df['Score'])
     ground_truth_df['Score'] = np.log2(ground_truth_df['Score'])
 
+    # Keep only the TFs and TGs that are shared between the datasets
+    shared_tfs = set(trans_reg_minus_ground_truth_df['TF']).intersection(set(ground_truth_df['TF']))
+    shared_tgs = set(trans_reg_minus_ground_truth_df['TG']).intersection(set(ground_truth_df['TG']))
+
+    # Filter each dataframe to include only the shared TFs and TGs
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df[
+        trans_reg_minus_ground_truth_df['TF'].isin(shared_tfs) & 
+        trans_reg_minus_ground_truth_df['TG'].isin(shared_tgs)
+    ]
+
+    ground_truth_df = ground_truth_df[
+        ground_truth_df['TF'].isin(shared_tfs) & 
+        ground_truth_df['TG'].isin(shared_tgs)
+    ]
+
     # Generating summary statistics for the Score column
     summarize_ground_truth_and_trans_reg(
         ground_truth,
