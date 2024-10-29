@@ -488,7 +488,7 @@ def cell_type_specific_TF_RE_binding_score_scNN(mat,TFbinding,RE,TG,TFoverlap):
     S.index=mat.index
     return S
 
-def cell_type_specific_TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,celltype,outdir,method):
+def cell_type_specific_TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,celltype,method):
     label=adata_RNA.obs['label'].values.tolist()
     labelset=list(set(label))
     if (celltype == 'all')&(method!='scNN'):
@@ -737,12 +737,12 @@ def load_RE_TG_distance(GRNdir,chrN,O_overlap_hg19_u,O_overlap_u,O_overlap,TGove
     return array
 
 
-def load_RE_TG_scNN(outdir, data_dir):   
+def load_RE_TG_scNN(outdir):   
     #print('load prior RE-TG ...')
     from scipy.sparse import coo_matrix
     import pandas as pd
     import numpy as np
-    dis=pd.read_csv(f'{data_dir}RE_gene_distance.txt',sep='\t',header=0)
+    dis=pd.read_csv(f'{outdir}RE_gene_distance.txt',sep='\t',header=0)
     dis['distance']=np.exp(-(0.5+dis['distance']/25000))
     REs=dis['RE'].unique()
     TGs=dis['gene'].unique()

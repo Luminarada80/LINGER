@@ -14,13 +14,13 @@ print(f'Reading in the RNAseq and ATACseq h5ad adata')
 adata_RNA = sc.read_h5ad(f'{shared_variables.data_dir}/adata_RNA.h5ad')
 adata_ATAC = sc.read_h5ad(f'{shared_variables.data_dir}/adata_ATAC.h5ad')
 
-command=f'paste {shared_variables.data_dir}/Peaks.bed {shared_variables.data_dir}/Peaks.txt > {shared_variables.data_dir}/region.txt'
-subprocess.run(command, shell=True)
+# command=f'paste {shared_variables.data_dir}/Peaks.bed {shared_variables.data_dir}/Peaks.txt > {shared_variables.data_dir}/region.txt'
+# subprocess.run(command, shell=True)
 
-genome_map=pd.read_csv(shared_variables.tss_motif_info_path+'genome_map_homer.txt',sep='\t',header=0)
-genome_map.index=genome_map['genome_short']
-command=f'findMotifsGenome.pl {shared_variables.data_dir}/region.txt '+'mm10'+' ./. -size given -find '+shared_variables.tss_motif_info_path+'all_motif_rmdup_'+genome_map.loc[shared_variables.genome]['Motif']+'> '+shared_variables.output_dir+'MotifTarget.bed'
-subprocess.run(command, shell=True)
+# genome_map=pd.read_csv(shared_variables.tss_motif_info_path+'genome_map_homer.txt',sep='\t',header=0)
+# genome_map.index=genome_map['genome_short']
+# command=f'findMotifsGenome.pl {shared_variables.data_dir}/region.txt '+'mm10'+' ./. -size given -find '+shared_variables.tss_motif_info_path+'all_motif_rmdup_'+genome_map.loc[shared_variables.genome]['Motif']+'> '+shared_variables.output_dir+'MotifTarget.bed'
+# subprocess.run(command, shell=True)
 
 print(f'Calculating cell-type specific TF RE binding for celltype "{shared_variables.celltype}"')
 LL_net.cell_type_specific_TF_RE_binding(

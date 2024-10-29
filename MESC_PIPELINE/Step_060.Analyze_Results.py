@@ -7,6 +7,7 @@ import logging
 import os
 import argparse
 import sys
+import statistics
 
 # Import the project directory to load the linger module
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
@@ -20,8 +21,8 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
-CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.output_dir}filtered_ground_truth_56TFs_3036TGs.csv'
-RESULT_DIR: str = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.ground_truth_dir}/filtered_ground_truth_56TFs_3036TGs.csv'
+RESULT_DIR: str = shared_variables.output_dir
 
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
@@ -361,35 +362,83 @@ def create_network_graph(ground_truth_df: pd.DataFrame, output_file: str):
     logging.info(f"\nNetwork graph saved to '{output_file}'.")
 
 
-def summarize_ground_truth_and_trans_reg(ground_truth_df: pd.DataFrame, trans_reg_network: pd.DataFrame, decimal_places: int = 2):
+def summarize_ground_truth_and_trans_reg(
+    original_ground_truth_df: pd.DataFrame, 
+    original_trans_reg_network: pd.DataFrame,
+    ground_truth_df: pd.DataFrame, 
+    trans_reg_network: pd.DataFrame, 
+    decimal_places: int = 2
+):
     """Generate summary statistics for both ground truth scores and trans-regulatory network scores and display them."""
     
-    # Generate summary statistics for the 'Score' column in the ground_truth_df
-    ground_truth_stats = ground_truth_df['Score'].describe()
+    # Define the summary file path
+    summary_file_path = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
     
-    # Generate summary statistics for the flattened trans_reg_network scores
-    trans_reg_stats = pd.Series(trans_reg_network.values.flatten()).describe()
+    # Helper function for logging and writing a message
+    def log_and_write(file, message):
+        logging.info(message)
+        file.write(message + '\n')
+    
+    # Helper function to summarize network data
+    def summarize_network(df, label, file, decimal_places=2, thresholds=None):
+        num_tfs = len(set(df["TF"]))
+        num_tgs = len(set(df["TG"]))
+        num_edges = len(df['Score'])
+        
+        mean_score = round(df['Score'].mean(), decimal_places)
+        median_score = round(df['Score'].median(), decimal_places)
+        stdev_score = round(df['Score'].std(), decimal_places)
 
-    # Combine the two sets of summary statistics into a single DataFrame
-    summary_stats = pd.DataFrame({
-        'Ground Truth': ground_truth_stats,
-        'Trans-Regulatory Network': trans_reg_stats
-    })
+        log_and_write(file, f'----- {label} Scores -----')
+        log_and_write(file, f'\tTFs: {num_tfs}, TGs: {num_tgs}, edges: {num_edges}')
+        log_and_write(file, f'\tMean: {mean_score}, Median: {median_score}, Stdev: {stdev_score}')
 
-    # Round the summary statistics to the specified number of decimal places
-    summary_stats = summary_stats.round(decimal_places)
+        if thresholds:
+            above_threshold = df[df['Score'] > thresholds['lower']]
+            below_threshold = df[df['Score'] < thresholds['lower']]
+            
+            log_and_write(file, f'\tNum scores ABOVE lower 2 stdev of mean: {above_threshold.shape[0]} '
+                                 f'({round((above_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
+            log_and_write(file, f'\tNum scores BELOW lower 2 stdev from mean: {below_threshold.shape[0]} '
+                                 f'({round((below_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
+        log_and_write(file, '')
 
-    # Print the rounded summary statistics to the terminal
-    print("\nSummary Statistics for Ground Truth Scores and Trans-Regulatory Network Scores (Rounded):")
-    print(summary_stats)
+    # Calculate threshold information for ground truth scores
+    gt_mean = ground_truth_df['Score'].mean()
+    gt_stdev = ground_truth_df['Score'].std()
+    thresholds = {
+        'lower': round(gt_mean - 2 * gt_stdev, decimal_places)
+    }
 
-    # Save the summary to a csv file
-    if CELL_POP == True:
-        summary_stats.to_csv(f'{RESULT_DIR}/cell_pop_summary_statistics.csv')
-    else:
-        summary_stats.to_csv(f'{RESULT_DIR}/{CELL_TYPE}/summary_statistics.csv')
+    with open(summary_file_path, 'w') as summary_file:
+        log_and_write(summary_file, '----- Summary Statistics -----')
+        log_and_write(summary_file, f'Total number of ground truth edges: {original_ground_truth_df.shape[0]}')
 
-    logging.info("Summary statistics saved to 'summary_statistics.csv'.")
+        # Percentage summaries for TFs and TGs in TRN
+        tf_percent = round((len(set(ground_truth_df['TF'])) / len(set(original_ground_truth_df['Source']))) * 100, decimal_places)
+        tg_percent = round((len(set(ground_truth_df['TG'])) / len(set(original_ground_truth_df['Target']))) * 100, decimal_places)
+        edge_percent = round((len(ground_truth_df['Score']) / original_ground_truth_df.shape[0]) * 100, decimal_places)
+
+        log_and_write(summary_file, f'{len(set(ground_truth_df["TF"]))}/{len(set(original_ground_truth_df["Source"]))} '
+                                     f'ground truth TFs in TRN ({tf_percent}%)')
+        log_and_write(summary_file, f'{len(set(ground_truth_df["TG"]))}/{len(set(original_ground_truth_df["Target"]))} '
+                                     f'ground truth TGs in TRN ({tg_percent}%)')
+        log_and_write(summary_file, f'{len(ground_truth_df["Score"])}/{original_ground_truth_df.shape[0]} '
+                                     f'ground truth edges in TRN ({edge_percent}%)')
+        
+        # TRN and non-TRN edges
+        trn_total_edges = original_trans_reg_network.shape[0] * original_trans_reg_network.shape[1]
+        non_trn_edges = trn_total_edges - len(ground_truth_df['Score'])
+        percent_in_trn = round((len(ground_truth_df['Score']) / trn_total_edges) * 100, decimal_places)
+
+        log_and_write(summary_file, f'\nTotal number of TRN edges: {trn_total_edges}')
+        log_and_write(summary_file, f'\tNumber of TRN edges NOT in ground truth network: {non_trn_edges}')
+        log_and_write(summary_file, f'\tPercent of TRN represented by ground truth: {percent_in_trn}%\n')
+
+        # Summarize both ground truth and trans-regulatory networks
+        summarize_network(ground_truth_df, 'Ground truth TRN', summary_file, decimal_places, thresholds)
+        summarize_network(trans_reg_network, 'Non-Ground Truth TRN', summary_file, decimal_places, thresholds)
+
 
 
 def main():
@@ -430,51 +479,76 @@ def main():
     logging.info(ground_truth.head())
 
     logging.info(f'\nGround truth scores')
+    logging.info(f'Number of TF-TG pairs: {ground_truth_df.shape[0]}')
     logging.info(ground_truth_df.head())
 
     # ----- Creating a dataframe of non-ground truth TRP scores (True Negative) -----
     # Reset index so the TGs become a column
     trans_reg_network.reset_index(inplace=True)
+    logging.info('\ntrans_reg_network')
+    logging.info(trans_reg_network.head())
 
     # Melt the TRP dataset to have it in the same format as the ground truth
+    # Rename the second column to TF
     trans_reg_net_melted = pd.melt(trans_reg_network, id_vars=['index'], var_name='TF', value_name='Score')
+    logging.info('\ntrans_reg_net_melted')
+    logging.info(trans_reg_net_melted.head())
 
-    # Add the column header for TGs
+    # Rename the 'index' column as 'TG'
     trans_reg_net_melted.rename(columns={'index': 'TG'}, inplace=True)
 
-    # Perform a left merge to find rows in trans_reg_pairs that are not in ground_truth_pairs
-    difference_df = pd.merge(trans_reg_net_melted, ground_truth_df, on=['TF', 'TG'], how='left', indicator=True)
+    # Step 1: Ensure that columns are properly formatted
+    trans_reg_net_melted['TF'] = trans_reg_net_melted['TF'].astype(str).str.strip()
+    trans_reg_net_melted['TG'] = trans_reg_net_melted['TG'].astype(str).str.strip()
+    ground_truth_df['TF'] = ground_truth_df['TF'].astype(str).str.strip()
+    ground_truth_df['TG'] = ground_truth_df['TG'].astype(str).str.strip()
 
-    logging.info(f'Difference df: \n{difference_df.head()}')
+    # Step 2: Perform the merge to identify non-ground-truth pairs
+    difference_df = pd.merge(
+        trans_reg_net_melted, 
+        ground_truth_df[['TF', 'TG']], 
+        on=['TF', 'TG'], 
+        how='left', 
+        indicator=True
+        )
 
-    # Store the true negatives as the TRP pairs not in the ground truth network (pairs that don't have a score in the ground truth dataframe)
-    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only']
+    logging.info(f'Difference df after merge:\n{difference_df.head()}')
 
-    logging.info(f'trans_reg_minus_ground_truth_df:\n{trans_reg_minus_ground_truth_df}')
+    # Select only entries that are not in the ground truth
+    trans_reg_minus_ground_truth_df = difference_df[difference_df['_merge'] == 'left_only'].copy()
 
-    # Keep only the relevant columns and rename for consistency
-    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop(columns=['_merge', 'Score_y']).rename(columns={'Score_x': 'Score'})
-
-    logging.info(f'trans_reg_minus_ground_truth_df (filtered):\n{trans_reg_minus_ground_truth_df}')
-
-    logging.info(f'\n----- Summary Statistics -----')
-    # Generating summary statistics for the Score column
-    summarize_ground_truth_and_trans_reg(ground_truth_df, trans_reg_minus_ground_truth_df, decimal_places=2)
-
-    # Calculate metrics to see how many of the ground truth TFs, TGs, and pairs are in the full 
-    # trans-regulatory potential dataset
-    num_rows = ground_truth.shape[0]
+    # Drop unnecessary columns and rename for consistency
+    trans_reg_minus_ground_truth_df = (
+        trans_reg_minus_ground_truth_df.drop(columns=['_merge'])
+        .rename(columns={'Score_x': 'Score'})
+    )
     
-    num_tf_ground_truth = len(set(ground_truth_df["TF"]))
-    num_tf_trans_net = len(set(tf_list))
+    # Ensure there are no overlaps by checking for any TF-TG pairs that appear in both dataframes
+    overlap_check = pd.merge(
+        trans_reg_minus_ground_truth_df[['TF', 'TG']], 
+        ground_truth_df[['TF', 'TG']], 
+        on=['TF', 'TG'], 
+        how='inner'
+    )
 
-    num_tg_ground_truth = len(set(ground_truth_df['TG']))
-    tg_overlap = len([tg for tg in set(ground_truth_df["TG"]) if tg not in tf_list])
+    if overlap_check.shape[0] > 0:
+        logging.warning("There are still ground truth pairs in trans_reg_minus_ground_truth_df!")
 
-    logging.info(f'\n{num_tf_trans_net}/{num_tf_ground_truth} of ground truth TFs are represented in the trans-regulatory network')
-    logging.info(f'{tg_overlap}/{num_tg_ground_truth} of ground truth TGs are represented in the trans-regulatory network')
+    # Check for and drop any duplicates in the filtered dataframe
+    trans_reg_minus_ground_truth_df = trans_reg_minus_ground_truth_df.drop_duplicates(subset=['TF', 'TG'])
 
-    logging.info(f'{num_nan} / {num_rows} ({round(num_nan/num_rows*100,2)}%) of TF to TG pairs did not have a score in the LINGER dataset')
+    # Convert the scores to log2
+    trans_reg_minus_ground_truth_df['Score'] = np.log2(trans_reg_minus_ground_truth_df['Score'])
+    ground_truth_df['Score'] = np.log2(ground_truth_df['Score'])
+
+    # Generating summary statistics for the Score column
+    summarize_ground_truth_and_trans_reg(
+        ground_truth,
+        trans_reg_network,
+        ground_truth_df,
+        trans_reg_minus_ground_truth_df,
+        decimal_places=2
+        )
 
     # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
     missing_tfs = [tf for tf in set(ground_truth_df["TF"]) if tf not in tf_list]
