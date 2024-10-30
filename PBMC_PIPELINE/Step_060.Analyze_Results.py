@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import argparse
+from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, f1_score
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 from linger import Benchmk
@@ -170,13 +171,9 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     linger_scores = trans_reg_network_minus_ground_truth['Score'].dropna()
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
-    # Handle zeros and small values by adding a small constant (1e-6)
-    linger_scores = np.where(linger_scores > 0, linger_scores, 1e-6)
-    ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
-
     # Plot histograms for the LINGER trans-reg network and ground truth network
-    plt.hist(np.log2(linger_scores), bins=150, log=True, alpha=0.7, label='True negative (non-ground truth scores)')
-    plt.hist(np.log2(ground_truth_scores), bins=150, log=True, alpha=0.7, label='True positive (ground truth scores)')
+    plt.hist(linger_scores, bins=150, log=True, alpha=0.7, label='Non-ground truth scores')
+    plt.hist(ground_truth_scores, bins=150, log=True, alpha=0.7, label='Ground truth scores')
 
     
     plt.rc('')
@@ -195,16 +192,76 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     plt.close()
     logging.info("\nTrans-regulatory distribution plot saved to 'trans_reg_distribution.png'.")
 
+def plot_precision_recall_curve(
+    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
+    ):
+    # Combine ground truth and non-ground truth data for classification
+    y_true = [1] * len(ground_truth_df) + [0] * len(trans_reg_minus_ground_truth_df)
+    scores = np.concatenate([ground_truth_df['Score'], trans_reg_minus_ground_truth_df['Score']])
+
+    # Compute precision-recall values
+    precision, recall, thresholds = precision_recall_curve(y_true, scores)
+    pr_auc = auc(recall, precision)
+
+    # Plot the precision-recall curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, label=f'Precision-Recall curve (AUC = {pr_auc:.2f})', color='blue')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc='lower left')
+    plt.grid()
+
+    # Save or show the plot
+    save_path = f'{RESULT_DIR}/precision_recall_curve.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/precision_recall_curve.png'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    logging.info(f'Precision-Recall curve saved to {save_path}')
+    plt.close()
+
+def plot_trans_reg_distribution_with_thresholds(
+    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
+    ):
+
+    lower_threshold = ground_truth_df['Score'].quantile(0.05)
+
+    # Split data into TP, FP, TN, FN based on threshold
+    tp_scores = ground_truth_df[ground_truth_df['Score'] >= lower_threshold]['Score']
+    fn_scores = ground_truth_df[ground_truth_df['Score'] < lower_threshold]['Score']
+    fp_scores = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['Score'] >= lower_threshold]['Score']
+    tn_scores = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['Score'] < lower_threshold]['Score']
+
+    # Plot histograms for each category with different colors
+    plt.figure(figsize=(10, 6))
+    plt.hist(tn_scores, bins=150, log=True, alpha=1, color='#b6cde0', label='True Negative (TN)')
+    plt.hist(fp_scores, bins=150, log=True, alpha=1, color='#4195df', label='False Positive (FP)')
+    plt.hist(fn_scores, bins=150, log=True, alpha=1, color='#efc69f', label='False Negative (FN)')
+    plt.hist(tp_scores, bins=150, log=True, alpha=1, color='#dc8634', label='True Positive (TP)')
+
+    # Plot threshold line
+    plt.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2, label='Classification Threshold')
+
+    # Add labels, title, and legend
+    plt.xlabel('log2 LINGER trans-regulatory potential score')
+    plt.ylabel('Frequency (log scale)')
+    plt.title('Distribution of TRP Scores with Classification Labels')
+    plt.legend(loc='upper left')
+
+    # Save the plot
+    if CELL_POP:
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution_classified.png', dpi=300)
+    else:
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution_classified.png', dpi=300)
+
+    plt.close()
+    logging.info("Trans-regulatory distribution plot with classification labels saved.")
+
 
 def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame):
     """Create box and whisker plots to compare trans-regulatory network scores and ground truth scores."""
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
-    ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
-
-    # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
+    trans_reg_scores = trans_reg_network_minus_ground_truth['Score']
+    ground_truth_scores = ground_truth_df['Score']
     lower_percentile=1
     upper_percentile=99
 
@@ -221,7 +278,7 @@ def plot_box_whisker(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
-        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive (ground truth)'] * len(ground_truth_filtered)
+        'Source': ['Non-ground truth'] * len(trans_reg_filtered) + ['Ground truth'] * len(ground_truth_filtered)
     })
 
     # Plot the box and whisker plot
@@ -248,17 +305,13 @@ def plot_violin(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth
     """Create violin plots to compare trans-regulatory network scores and ground truth scores."""
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
-    ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
-
-    # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
+    trans_reg_scores = trans_reg_network_minus_ground_truth['Score']
+    ground_truth_scores = ground_truth_df['Score']
 
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_scores, ground_truth_scores]),
-        'Source': ['True Negative'] * len(trans_reg_scores) + ['True Positive (ground truth)'] * len(ground_truth_scores)
+        'Source': ['Non-ground truth'] * len(trans_reg_scores) + ['Ground truth'] * len(ground_truth_scores)
     })
 
     # Plot the violin plot
@@ -284,12 +337,8 @@ def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFr
     """Create violin plots for trans-regulatory network scores and ground truth scores after removing outliers."""
 
     # Handle zeros and small values by adding a small constant (1e-6)
-    trans_reg_scores = np.where(trans_reg_network_minus_ground_truth['Score'] > 0, trans_reg_network_minus_ground_truth['Score'], 1e-6)
-    ground_truth_scores = np.where(ground_truth_df['Score'] > 0, ground_truth_df['Score'], 1e-6)
-
-    # Apply log2 transformation after ensuring no zero or negative values
-    trans_reg_scores = np.log2(trans_reg_scores)
-    ground_truth_scores = np.log2(ground_truth_scores)
+    trans_reg_scores = trans_reg_network_minus_ground_truth['Score']
+    ground_truth_scores = ground_truth_df['Score']
 
     # Remove outliers based on specified percentiles
     trans_reg_lower = np.percentile(trans_reg_scores, lower_percentile)
@@ -304,7 +353,7 @@ def plot_violin_without_outliers(trans_reg_network_minus_ground_truth: pd.DataFr
     # Combine both into a single DataFrame for comparison
     scores_df = pd.DataFrame({
         'Score': np.concatenate([trans_reg_filtered, ground_truth_filtered]),
-        'Source': ['True Negative'] * len(trans_reg_filtered) + ['True Positive (ground truth)'] * len(ground_truth_filtered)
+        'Source': ['Non-ground truth'] * len(trans_reg_filtered) + ['Ground truth'] * len(ground_truth_filtered)
     })
 
     # Plot the violin plot without outliers
@@ -370,30 +419,26 @@ def summarize_ground_truth_and_trans_reg(
         log_and_write(file, f'\tMean: {mean_score}, Median: {median_score}, Stdev: {stdev_score}')
 
         if thresholds:
-            above_threshold = df[df['Score'] > thresholds['lower']]
-            below_threshold = df[df['Score'] < thresholds['lower']]
-            log_and_write(file, f'Lower threshold: {thresholds["lower"]}')
+            above_threshold = df[df['Score'] > thresholds['lower']].copy()
+            below_threshold = df[df['Score'] < thresholds['lower']].copy()
             
             log_and_write(file, f'\tNum scores ABOVE lower 2 stdev of mean: {above_threshold.shape[0]} '
                                  f'({round((above_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
-            
             log_and_write(file, f'\tNum scores BELOW lower 2 stdev from mean: {below_threshold.shape[0]} '
                                  f'({round((below_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
-        log_and_write(file, '')
+
 
     # Calculate threshold information for ground truth scores
-    gt_mean = ground_truth_df['Score'].mean()
-    gt_stdev = ground_truth_df['Score'].std()
     thresholds = {
-        'lower': round(gt_mean - 2 * gt_stdev, decimal_places)
+        'lower': round(ground_truth_df['Score'].quantile(0.05), decimal_places)
     }
 
+    # Ensure result directory exists
+    os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
+    
     with open(summary_file_path, 'w') as summary_file:
         log_and_write(summary_file, '----- Summary Statistics -----')
         log_and_write(summary_file, f'Total number of ground truth edges: {original_ground_truth_df.shape[0]}')
-
-        logging.info(ground_truth_df.head())
-        logging.info(original_ground_truth_df.head())
 
         # Percentage summaries for TFs and TGs in TRN
         tf_percent = round((len(set(ground_truth_df['TF'])) / len(set(original_ground_truth_df[0]))) * 100, decimal_places)
@@ -420,6 +465,70 @@ def summarize_ground_truth_and_trans_reg(
         summarize_network(ground_truth_df, 'Ground truth TRN', summary_file, decimal_places, thresholds)
         summarize_network(trans_reg_network, 'Non-Ground Truth TRN', summary_file, decimal_places, thresholds)
 
+def plot_auroc(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame):
+    # Calculate mean and standard deviation of ground truth scores
+    gt_mean = ground_truth_df['Score'].mean()
+    gt_std = ground_truth_df['Score'].std()
+
+    # Define the lower threshold
+    lower_threshold = ground_truth_df['Score'].quantile(0.05)
+
+    # Classify ground truth scores
+    ground_truth_df['true_interaction'] = 1  # All entries in ground_truth_df are true interactions
+    ground_truth_df['predicted_interaction'] = np.where(
+        ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for TP, 0 for FN
+
+    # Count ground truth classifications
+    tp_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 1].shape[0]
+    fn_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 0].shape[0]
+    logging.info(f"\nGround Truth Scores: TP={tp_count}, FN={fn_count}")
+
+    # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
+    trans_reg_minus_ground_truth_df['true_interaction'] = 0  # All entries are non-interactions
+    trans_reg_minus_ground_truth_df['predicted_interaction'] = np.where(
+        trans_reg_minus_ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for FP, 0 for TN
+
+    # Count non-ground truth classifications
+    fp_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 1].shape[0]
+    tn_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 0].shape[0]
+    logging.info(f"Non-Ground Truth Scores: FP={fp_count}, TN={tn_count}")
+
+    # Concatenate dataframes for AUC and further analysis
+    auc_df = pd.concat([ground_truth_df, trans_reg_minus_ground_truth_df])
+
+    # Calculate the confusion matrix to confirm the results programmatically
+    from sklearn.metrics import confusion_matrix
+
+    y_true = auc_df['true_interaction']
+    y_pred = auc_df['predicted_interaction']
+    conf_matrix = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = conf_matrix.ravel()
+
+    logging.info(f'\nTrue Posities: {tp}')
+    logging.info(f'False Posities: {fp}')
+    logging.info(f'True Negatives: {tn}')
+    logging.info(f'False Negatives: {fn}')
+
+    # Calculate ROC Curve and AUC
+    fpr, tpr, thresholds = roc_curve(y_true, auc_df['Score'])
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve for Trans-Regulatory Potential Score Classification')
+    plt.legend(loc="lower right")
+    plt.grid()
+
+    # Save the plot based on CELL_POP and CELL_TYPE
+    save_path = f'{RESULT_DIR}/AUC.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/AUC.png'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    logging.info(f'Saved AUROC to {save_path}')
+
+    plt.close()
 
 def main():
     """Main function to run the analysis of the LINGER output"""
@@ -545,6 +654,8 @@ def main():
         trans_reg_minus_ground_truth_df,
         decimal_places=2
         )
+    
+    plot_auroc(ground_truth_df, trans_reg_minus_ground_truth_df)
 
     # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
     missing_tfs = [tf for tf in set(ground_truth_df["TF"]) if tf not in tf_list]
@@ -557,6 +668,10 @@ def main():
     # ----- FIGURES -----
     # Histogram distribution of trans-regulatory potential scores and ground truth scores
     plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
+
+    plot_precision_recall_curve(ground_truth_df, trans_reg_minus_ground_truth_df)
+
+    plot_trans_reg_distribution_with_thresholds(ground_truth_df, trans_reg_minus_ground_truth_df)
 
     # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
     plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
