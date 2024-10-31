@@ -488,7 +488,7 @@ def cell_type_specific_TF_RE_binding_score_scNN(mat,TFbinding,RE,TG,TFoverlap):
     S.index=mat.index
     return S
 
-def cell_type_specific_TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,celltype,method):
+def cell_type_specific_TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,celltype,outdir,method):
     label=adata_RNA.obs['label'].values.tolist()
     labelset=list(set(label))
     if (celltype == 'all')&(method!='scNN'):
