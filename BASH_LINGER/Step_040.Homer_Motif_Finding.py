@@ -23,5 +23,5 @@ subprocess.run(command, shell=True)
 
 genome_map=pd.read_csv(args.tss_motif_info_path+'genome_map_homer.txt',sep='\t',header=0)
 genome_map.index=genome_map['genome_short']
-command=f'findMotifsGenome.pl {args.sample_data_dir}/region.txt '+'mm10'+' ./. -size given -find '+args.tss_motif_info_path+'all_motif_rmdup_'+genome_map.loc[args.genome]['Motif']+'> '+args.output_dir+'MotifTarget.bed'
+command=f'findMotifsGenome.pl -p 4 {args.sample_data_dir}/region.txt '+args.genome+' ./. -size given -find '+args.tss_motif_info_path+'all_motif_rmdup_'+genome_map.loc[args.genome]['Motif']+'> '+args.output_dir+'MotifTarget.bed'
 subprocess.run(command, shell=True)

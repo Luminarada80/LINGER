@@ -27,3 +27,4 @@ grep
 *.rds
 /.idea/*
 *.pdf
+*.out

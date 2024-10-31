@@ -38,7 +38,7 @@ LL_net.TF_RE_binding(
 print(f'Calculating the cis-regulatory network')
 LL_net.cis_reg(
   args.tss_motif_info_path,
-  args.sample_ata_dir,
+  args.sample_data_dir,
   adata_RNA,
   adata_ATAC,
   args.genome,
