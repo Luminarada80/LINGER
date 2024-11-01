@@ -10,10 +10,10 @@ import sys
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, f1_score
 
 # Import the project directory to load the linger module
-sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/')
 
 from linger import Benchmk
-import MESC_PIPELINE.shared_variables as shared_variables
+import BASH_LINGER.shared_variables as shared_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -22,11 +22,10 @@ CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
 CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.ground_truth_dir}/filtered_ground_truth_56TFs_3036TGs.csv'
-RESULT_DIR: str = shared_variables.results_dir
 
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
-    'mESC': 'all'
+    'mESC': 'all',
 }
 # ----------------------------------------------------------------
 
@@ -43,6 +42,12 @@ def parse_args():
         type=str,
         required=False,
         help="Enter the name of the cell type as it is formatted in the LINGER cell-type specific output directory"
+    )
+    parser.add_argument(
+        "--sample_num",
+        type=str,
+        required=True,
+        help="Enter the number for the subsample directory"
     )
 
     args = parser.parse_args()
@@ -62,6 +67,12 @@ def parse_args():
 args = parse_args()
 CELL_POP = args.cell_pop  # Default False
 CELL_TYPE = args.cell_type
+SAMPLE_NUM = args.sample_num
+
+RESULT_DIR: str = f'{shared_variables.results_dir}/sample_{SAMPLE_NUM}/'
+
+if not os.path.exists(RESULT_DIR):
+    os.makedirs(RESULT_DIR)
 
 # Example usage
 print(f'CELL_POP is set to "{CELL_POP}"')
@@ -70,14 +81,14 @@ if CELL_POP == False:
     print(f'CELL_TYPE is set to "{CELL_TYPE}"')
 
 if CELL_POP == True:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}cell_population_TF_RE_binding.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_population_cis_regulatory.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_population_trans_regulatory.txt'
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_TF_RE_binding.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_cis_regulatory.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_trans_regulatory.txt'
 
 elif CELL_POP == False:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
 
     # Make sure that the cell type specific dataset is present
     os.makedirs(f'{RESULT_DIR}/{CELL_TYPE}', exist_ok=True)
