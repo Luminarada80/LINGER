@@ -226,33 +226,6 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     plt.close()
     logging.info("\nTrans-regulatory distribution plot saved to 'trans_reg_distribution.png'.")
 
-def plot_precision_recall_curve(
-    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
-    ):
-    # Combine ground truth and non-ground truth data for classification
-    y_true = [1] * len(ground_truth_df) + [0] * len(trans_reg_minus_ground_truth_df)
-    scores = np.concatenate([ground_truth_df['Score'], trans_reg_minus_ground_truth_df['Score']])
-
-    # Compute precision-recall values
-    precision, recall, thresholds = precision_recall_curve(y_true, scores)
-    pr_auc = auc(recall, precision)
-
-    # Plot the precision-recall curve
-    plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, label=f'Precision-Recall curve (AUC = {pr_auc:.2f})', color='blue')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-    plt.legend(loc='lower left')
-    plt.grid()
-
-    # Save or show the plot
-    save_path = f'{RESULT_DIR}/precision_recall_curve.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/precision_recall_curve.png'
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300)
-    logging.info(f'Precision-Recall curve saved to {save_path}')
-    plt.close()
-
 def plot_trans_reg_distribution_with_thresholds(
     ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
 ):
@@ -429,6 +402,10 @@ def create_network_graph(ground_truth_df: pd.DataFrame, output_file: str):
     nx.write_gexf(G, output_file)
     logging.info(f"\nNetwork graph saved to '{output_file}'.")
 
+# Helper function for logging and writing a message
+def log_and_write(file, message):
+    logging.info(message)
+    file.write(message + '\n')
 
 def summarize_ground_truth_and_trans_reg(
     original_ground_truth_df: pd.DataFrame, 
@@ -457,17 +434,19 @@ def summarize_ground_truth_and_trans_reg(
         median_score = round(df['Score'].median(), decimal_places)
         stdev_score = round(df['Score'].std(), decimal_places)
 
-        log_and_write(file, f'----- {label} Scores -----')
-        log_and_write(file, f'\tTFs: {num_tfs}, TGs: {num_tgs}, edges: {num_edges}')
-        log_and_write(file, f'\tMean: {mean_score}, Median: {median_score}, Stdev: {stdev_score}')
+        log_and_write(file, f'- **{label} Scores**')
+        log_and_write(file, f'\t- TFs: **{num_tfs:,}**')
+        log_and_write(file, f'\t- TGs: **{num_tgs:,}**')
+        log_and_write(file, f'\t- edges: **{num_edges:,}**')
+        log_and_write(file, f'\t- Mean: {mean_score}, Median: {median_score}, Stdev: {stdev_score}')
 
         if thresholds:
             above_threshold = df[df['Score'] > thresholds['lower']].copy()
             below_threshold = df[df['Score'] < thresholds['lower']].copy()
             
-            log_and_write(file, f'\tNum scores ABOVE 1st percentile: {above_threshold.shape[0]} '
+            log_and_write(file, f'\t- Num scores ABOVE 1st percentile: **{above_threshold.shape[0]:,}** '
                                  f'({round((above_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
-            log_and_write(file, f'\tNum scores BELOW 1st percentile: {below_threshold.shape[0]} '
+            log_and_write(file, f'\t- Num scores BELOW 1st percentile: **{below_threshold.shape[0]:,}** '
                                  f'({round((below_threshold.shape[0] / num_edges) * 100, decimal_places)}%)')
 
 
@@ -482,19 +461,19 @@ def summarize_ground_truth_and_trans_reg(
     os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
     
     with open(summary_file_path, 'w') as summary_file:
-        log_and_write(summary_file, '----- Summary Statistics -----')
-        log_and_write(summary_file, f'Total number of ground truth edges: {original_ground_truth_df.shape[0]}')
+        log_and_write(summary_file, '- **Summary Statistics**')
+        log_and_write(summary_file, f'\t- Total number of ground truth edges: **{original_ground_truth_df.shape[0]:,}**')
 
         # Percentage summaries for TFs and TGs in TRN
         tf_percent = round((len(set(ground_truth_df['TF'])) / len(set(original_ground_truth_df['Source']))) * 100, decimal_places)
         tg_percent = round((len(set(ground_truth_df['TG'])) / len(set(original_ground_truth_df['Target']))) * 100, decimal_places)
         edge_percent = round((len(ground_truth_df['Score']) / original_ground_truth_df.shape[0]) * 100, decimal_places)
 
-        log_and_write(summary_file, f'{len(set(ground_truth_df["TF"]))}/{len(set(original_ground_truth_df["Source"]))} '
+        log_and_write(summary_file, f'\t- **{len(set(ground_truth_df["TF"])):,}/{len(set(original_ground_truth_df["Source"])):,}** '
                                      f'ground truth TFs in TRN ({tf_percent}%)')
-        log_and_write(summary_file, f'{len(set(ground_truth_df["TG"]))}/{len(set(original_ground_truth_df["Target"]))} '
+        log_and_write(summary_file, f'\t- **{len(set(ground_truth_df["TG"])):,}/{len(set(original_ground_truth_df["Target"])):,}** '
                                      f'ground truth TGs in TRN ({tg_percent}%)')
-        log_and_write(summary_file, f'{len(ground_truth_df["Score"])}/{original_ground_truth_df.shape[0]} '
+        log_and_write(summary_file, f'\t- **{len(ground_truth_df["Score"]):,}/{original_ground_truth_df.shape[0]:,}** '
                                      f'ground truth edges in TRN ({edge_percent}%)')
         
         # TRN and non-TRN edges
@@ -502,58 +481,118 @@ def summarize_ground_truth_and_trans_reg(
         non_trn_edges = trn_total_edges - len(ground_truth_df['Score'])
         percent_in_trn = round((len(ground_truth_df['Score']) / trn_total_edges) * 100, decimal_places)
 
-        log_and_write(summary_file, f'\nTotal number of TRN edges: {trn_total_edges}')
-        log_and_write(summary_file, f'\tNumber of TRN edges NOT in ground truth network: {non_trn_edges}')
-        log_and_write(summary_file, f'\tPercent of TRN represented by ground truth: {percent_in_trn}%\n')
+        log_and_write(summary_file, f'\n- **Total number of TRN edges: {trn_total_edges:,}**')
+        log_and_write(summary_file, f'\t- Number of TRN edges NOT in ground truth network: **{non_trn_edges:,}**')
+        log_and_write(summary_file, f'\t- Percent of TRN represented by ground truth: **{percent_in_trn}%**\n')
 
         # Summarize both ground truth and trans-regulatory networks
         summarize_network(ground_truth_df, 'Ground truth TRN', summary_file, decimal_places, thresholds)
         summarize_network(trans_reg_network, 'Non-Ground Truth TRN', summary_file, decimal_places, thresholds)
         
-def plot_auroc(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame):
+def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame):
     # Define the lower threshold
     lower_threshold = ground_truth_df['Score'].quantile(0.05)
 
     # Classify ground truth scores
-    ground_truth_df['true_interaction'] = 1  # All entries in ground_truth_df are true interactions
+    ground_truth_df['true_interaction'] = 1
     ground_truth_df['predicted_interaction'] = np.where(
-        ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for TP, 0 for FN
-
-    # Count ground truth classifications
-    tp_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 1].shape[0]
-    fn_count = ground_truth_df[ground_truth_df['predicted_interaction'] == 0].shape[0]
-    logging.info(f"\nGround Truth Scores: TP={tp_count}, FN={fn_count}")
+        ground_truth_df['Score'] >= lower_threshold, 1, 0)
 
     # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
-    trans_reg_minus_ground_truth_df['true_interaction'] = 0  # All entries are non-interactions
+    trans_reg_minus_ground_truth_df['true_interaction'] = 0
     trans_reg_minus_ground_truth_df['predicted_interaction'] = np.where(
-        trans_reg_minus_ground_truth_df['Score'] >= lower_threshold, 1, 0)  # 1 for FP, 0 for TN
-
-    # Count non-ground truth classifications
-    fp_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 1].shape[0]
-    tn_count = trans_reg_minus_ground_truth_df[trans_reg_minus_ground_truth_df['predicted_interaction'] == 0].shape[0]
-    logging.info(f"Non-Ground Truth Scores: FP={fp_count}, TN={tn_count}")
+        trans_reg_minus_ground_truth_df['Score'] >= lower_threshold, 1, 0)
 
     # Concatenate dataframes for AUC and further analysis
     auc_df = pd.concat([ground_truth_df, trans_reg_minus_ground_truth_df])
 
-    # Calculate the confusion matrix to confirm the results programmatically
-    from sklearn.metrics import confusion_matrix
-
+    # Calculate the confusion matrix
     y_true = auc_df['true_interaction']
     y_pred = auc_df['predicted_interaction']
-    conf_matrix = confusion_matrix(y_true, y_pred)
-    tn, fp, fn, tp = conf_matrix.ravel()
-
-    logging.info(f'\nTrue Positives: {tp}')
-    logging.info(f'False Positives: {fp}')
-    logging.info(f'True Negatives: {tn}')
-    logging.info(f'False Negatives: {fn}')
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
     # Calculate ROC Curve and AUC
     fpr, tpr, thresholds = roc_curve(y_true, auc_df['Score'])
+
+    roc_curve_dict = {
+        'fpr': fpr,
+        'tpr': tpr
+    }
+
+    roc_curve_df = pd.DataFrame(roc_curve_dict)
+    roc_curve_df.to_csv(f'{shared_variables.results_dir}/{SAMPLE_NUM}_roc_curve_df.csv', index=False)
+
     roc_auc = auc(fpr, tpr)
 
+    # Calculations for accuracy metrics
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    jaccard_index = tp / (tp + fp + fn)
+
+    # Weighted Jaccard Index
+    weighted_tp = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 1, 'Score'].sum()
+    weighted_fp = trans_reg_minus_ground_truth_df.loc[trans_reg_minus_ground_truth_df['predicted_interaction'] == 1, 'Score'].sum()
+    weighted_fn = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 0, 'Score'].sum()
+    weighted_jaccard_index = weighted_tp / (weighted_tp + weighted_fp + weighted_fn)
+
+    # Early Precision Rate for top 1000 predictions
+    top_1000 = auc_df.nlargest(1000, 'Score')
+    early_tp = top_1000[top_1000['true_interaction'] == 1].shape[0]
+    early_fp = top_1000[top_1000['true_interaction'] == 0].shape[0]
+    early_precision_rate = early_tp / (early_tp + early_fp)
+
+    # Define the summary file path
+    summary_file_path = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
+
+    pr_auc = plot_precision_recall_curve(ground_truth_df, trans_reg_minus_ground_truth_df)
+
+    # Write results to summary file
+    with open(summary_file_path, 'a') as file:
+        log_and_write(file, f'\n- **TP, TN, FP, FN Counts**')
+        log_and_write(file, f'\t- True Positives: {tp:,}')
+        log_and_write(file, f'\t- False Positives: {fp:,}')
+        log_and_write(file, f'\t- True Negatives: {tn:,}')
+        log_and_write(file, f'\t- False Negatives: {fn:,}')
+
+        log_and_write(file, f'\n- **Accuracy Metrics**')
+        log_and_write(file, f"\t- precision: {precision:.4f}")
+        log_and_write(file, f"\t- recall: {recall:.4f}")
+        log_and_write(file, f"\t- specificity: {specificity:.4f}")
+        log_and_write(file, f"\t- accuracy: {accuracy:.4f}")
+        log_and_write(file, f"\t- f1 score: {f1_score:.4f}")
+        log_and_write(file, f"\t- Jaccard Index: {jaccard_index:.4f}")
+        log_and_write(file, f"\t- Weighted Jaccard Index: {weighted_jaccard_index:.4f}")
+        log_and_write(file, f"\t- Early Precision Rate (top 1000): {early_precision_rate:.4f}")
+
+        log_and_write(file, f'\n- **AUROC and AUPRC**')
+        log_and_write(file, f'\t- AUROC: {roc_auc:.2f}')
+        log_and_write(file, f'\t- AUPRC: {pr_auc:.2f}')
+    
+    summary_dict = {
+        "cell_counts": [SAMPLE_NUM],
+        "precision": [precision],
+        "recall": [recall],
+        "specificity": [specificity],
+        "accuracy": [accuracy],
+        "f1_score": [f1_score],
+        "jaccard_index": [jaccard_index],
+        "weighted_jaccard_index": [weighted_jaccard_index],
+        "early_precision_rate": [early_precision_rate],
+        "auroc": [roc_auc],
+        "auprc": [pr_auc]
+    }
+
+
+    # Append the new row to the DataFrame
+    summary_df = pd.DataFrame(summary_dict)
+
+    # Save the more easily-parsable format
+    summary_df.to_csv(f'{shared_variables.results_dir}/{SAMPLE_NUM}_accuracy_metrics_summary.csv', index=False)
+
+    # Plotting the ROC Curve
     plt.figure(figsize=(8, 6))
     plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUC = {roc_auc:.2f})')
     plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
@@ -563,13 +602,50 @@ def plot_auroc(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: p
     plt.legend(loc="lower right")
     plt.grid()
 
-    # Save the plot based on CELL_POP and CELL_TYPE
+    # Save the plot
     save_path = f'{RESULT_DIR}/AUC.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/AUC.png'
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300)
     logging.info(f'Saved AUROC to {save_path}')
 
     plt.close()
+
+def plot_precision_recall_curve(
+    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
+    ):
+    # Combine ground truth and non-ground truth data for classification
+    y_true = [1] * len(ground_truth_df) + [0] * len(trans_reg_minus_ground_truth_df)
+    scores = np.concatenate([ground_truth_df['Score'], trans_reg_minus_ground_truth_df['Score']])
+
+    # Compute precision-recall values
+    precision, recall, thresholds = precision_recall_curve(y_true, scores)
+    pr_auc = auc(recall, precision) 
+
+    # Plot the precision-recall curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, label=f'Precision-Recall curve (AUC = {pr_auc:.2f})', color='blue')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc='lower left')
+    plt.grid()
+
+    # Save or show the plot
+    save_path = f'{RESULT_DIR}/precision_recall_curve.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/precision_recall_curve.png'
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    logging.info(f'Precision-Recall curve saved to {save_path}')
+    plt.close()
+
+    pr_curve_dict = {
+        'precision': precision,
+        'recall': recall
+    }
+
+    pr_curve_df = pd.DataFrame(pr_curve_dict)
+    pr_curve_df.to_csv(f'{shared_variables.results_dir}/{SAMPLE_NUM}_pr_curve_df.csv', index=False)
+
+    return pr_auc
 
 
 def main():
@@ -687,8 +763,6 @@ def main():
         ground_truth_df['TG'].isin(shared_tgs)
     ]
 
-
-
     # Generating summary statistics for the Score column
     summarize_ground_truth_and_trans_reg(
         ground_truth,
@@ -698,7 +772,7 @@ def main():
         decimal_places=2
     )
 
-    plot_auroc(ground_truth_df, trans_reg_minus_ground_truth_df)
+    accuracy_metrics_and_plots(ground_truth_df, trans_reg_minus_ground_truth_df)
 
 
     # Find any TFs that are present in the ground truth dataset that are not in the e full dataset
@@ -721,15 +795,15 @@ def main():
     plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Plot a violin plot of the trans-regulatory potential scores and ground truth scores
-    plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
+    # plot_violin(trans_reg_minus_ground_truth_df, ground_truth_df)
 
     # Violin plot with outliers removed
     plot_violin_without_outliers(trans_reg_minus_ground_truth_df, ground_truth_df)
 
-
     # ----- NETWORKX NETWORK -----
     # Create and save the network graph
-    create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
+    # create_network_graph(ground_truth_df, f'{RESULT_DIR}/transcription_factor_target_gene_network.gexf')
 
 if __name__ == '__main__':
+
     main()

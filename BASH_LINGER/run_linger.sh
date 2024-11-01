@@ -2,8 +2,8 @@
 
 #SBATCH -p compute
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=50G
+#SBATCH -c 16
+#SBATCH --mem-per-cpu=16G
 
 source /gpfs/Home/esm5360/.bashrc
 conda activate LINGER_1.92
