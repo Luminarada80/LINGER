@@ -71,6 +71,9 @@ SAMPLE_NUM = args.sample_num
 
 RESULT_DIR: str = f'{shared_variables.results_dir}/70_percent_sample_{SAMPLE_NUM}/'
 
+# Define the summary file path
+SUMMARY_FILE_PATH = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
+
 if not os.path.exists(RESULT_DIR):
     os.makedirs(RESULT_DIR)
 
@@ -427,8 +430,7 @@ def summarize_ground_truth_and_trans_reg(
 ):
     """Generate summary statistics for both ground truth scores and trans-regulatory network scores and display them."""
     
-    # Define the summary file path
-    summary_file_path = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
+    
     
     # Helper function for logging and writing a message
     def log_and_write(file, message):
@@ -470,9 +472,9 @@ def summarize_ground_truth_and_trans_reg(
     }
 
     # Ensure result directory exists
-    os.makedirs(os.path.dirname(summary_file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(SUMMARY_FILE_PATH), exist_ok=True)
     
-    with open(summary_file_path, 'w') as summary_file:
+    with open(SUMMARY_FILE_PATH, 'w') as summary_file:
         log_and_write(summary_file, '- **Summary Statistics**')
         log_and_write(summary_file, f'\t- Total number of ground truth edges: **{original_ground_truth_df.shape[0]:,}**')
 
@@ -489,11 +491,16 @@ def summarize_ground_truth_and_trans_reg(
                                      f'ground truth edges in TRN ({edge_percent}%)')
         
         # TRN and non-TRN edges
-        trn_total_edges = original_trans_reg_network.shape[0] * original_trans_reg_network.shape[1]
-        non_trn_edges = trn_total_edges - len(ground_truth_df['Score'])
-        percent_in_trn = round((len(ground_truth_df['Score']) / trn_total_edges) * 100, decimal_places)
+        num_trn_tfs = original_trans_reg_network.shape[0]
+        num_trn_tgs = original_trans_reg_network.shape[1]
+        num_trn_edges = original_trans_reg_network.shape[0] * original_trans_reg_network.shape[1]
+        non_trn_edges = num_trn_edges - len(ground_truth_df['Score'])
+        percent_in_trn = round((len(ground_truth_df['Score']) / num_trn_edges) * 100, decimal_places)
 
-        log_and_write(summary_file, f'\n- **Total number of TRN edges: {trn_total_edges:,}**')
+        log_and_write(summary_file, f'\n- **LINGER Inferred Network:**')
+        log_and_write(summary_file, f'\t- Inferred TRN TFs: **{num_trn_tfs:,}**')
+        log_and_write(summary_file, f'\t- Inferred TRN TGs: **{num_trn_tgs:,}**')
+        log_and_write(summary_file, f'\t- Inferred TRN edges: **{num_trn_edges:,}**')
         log_and_write(summary_file, f'\t- Number of TRN edges NOT in ground truth network: **{non_trn_edges:,}**')
         log_and_write(summary_file, f'\t- Percent of TRN represented by ground truth: **{percent_in_trn}%**\n')
 
@@ -561,13 +568,10 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     early_fp = top_1000[top_1000['true_interaction'] == 0].shape[0]
     early_precision_rate = early_tp / (early_tp + early_fp)
 
-    # Define the summary file path
-    summary_file_path = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
-
     pr_auc = plot_precision_recall_curve(ground_truth_df, trans_reg_minus_ground_truth_df)
 
     # Write results to summary file
-    with open(summary_file_path, 'a') as file:
+    with open(SUMMARY_FILE_PATH, 'a') as file:
         log_and_write(file, f'\n- **TP, TN, FP, FN Counts**')
         log_and_write(file, f'\t- True Positives: {tp:,}')
         log_and_write(file, f'\t- False Positives: {fp:,}')
