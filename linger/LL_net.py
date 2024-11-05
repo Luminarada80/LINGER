@@ -675,7 +675,7 @@ def TF_RE_LINGER_chr(chr: str, data_dir: str, outdir: str) -> pd.DataFrame:
     resultlist: list[pd.DataFrame] = [None] * (times + 1)
 
     # Iterate through each batch of genes
-    for ii in tqdm(range(times)):
+    for ii in range(times):
         result_all: pd.DataFrame = pd.DataFrame([])
 
         # Process each gene within the current batch
@@ -819,7 +819,6 @@ def TF_RE_binding(
         outdir (str):
             Output directory path.
     """
-    from tqdm import tqdm
     import numpy as np
     import pandas as pd
 
@@ -832,7 +831,7 @@ def TF_RE_binding(
         # Initialize an empty DataFrame to store results
         result = pd.DataFrame()
         # Iterate over all chromosomes (1-22 and X)
-        for i in tqdm(range(23)):
+        for i in range(23):
             chrN = chrom[i]  # Get the current chromosome name
             # Call the function to compute TF binding for the current chromosome
             out = TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, outdir)
@@ -852,7 +851,7 @@ def TF_RE_binding(
         # Initialize an empty DataFrame to store results
         result = pd.DataFrame()
         # Iterate over all chromosomes (1-22 and X)
-        for i in tqdm(range(23)):
+        for i in range(23):
             chrN = chrom[i]  # Get the current chromosome name
             # Load the TF-RE binding matrix for the current chromosome using LINGER method
             mat = TF_RE_LINGER_chr(chrN, data_dir, outdir)
@@ -895,7 +894,7 @@ def TF_RE_binding(
         result_all = pd.DataFrame([])
 
         # Iterate over all unique chromosomes present in the RE_TGlink DataFrame
-        for jj in tqdm(range(len(chrlist))):  # Use len(chrlist) instead of hardcoding 23
+        for jj in range(len(chrlist)):  # Use len(chrlist) instead of hardcoding 23
             chrtemp = chrlist[jj]  # Get the current chromosome
             # Filter the RE_TGlink DataFrame for the current chromosome
             RE_TGlink_chr = RE_TGlink[RE_TGlink['chr'] == chrtemp]
@@ -1146,7 +1145,7 @@ def cell_type_specific_TF_RE_binding(
             result = pd.DataFrame()
 
             # Iterate over chromosomes 1-22
-            for i in tqdm(range(22)):
+            for i in range(22):
                 chrN = 'chr' + str(i + 1)
                 # Read the cell population TF-RE binding matrix for the chromosome
                 mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
@@ -1171,7 +1170,7 @@ def cell_type_specific_TF_RE_binding(
         chrom.append('chrX')  # Add chromosome X
 
         # Iterate over all chromosomes
-        for i in tqdm(range(23)):
+        for i in range(23):
             chrN = chrom[i]
             mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
             out = cell_type_specific_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, celltype, outdir, method, mat)
@@ -1354,10 +1353,8 @@ def cis_shap(chromosome: str, data_directory: str, output_directory: str):
     # Load required data for Shapley value computation from external function
     merged_data, gene_names, regulatory_element_indices, transcription_factor_indices, shapley_values, transcription_factor_names, regulatory_element_names = load_shapley(chromosome, data_directory, output_directory)
 
-    from tqdm import tqdm
-
     # Iterate over each row in the merged data
-    for row_index in tqdm(range(merged_data.shape[0])):
+    for row_index in range(merged_data.shape[0]):
 
         # Get the current index corresponding to the row
         current_index = merged_data.index[row_index]
@@ -1434,10 +1431,8 @@ def trans_shap(chromosome: str, data_directory: str, output_directory: str) -> p
     # Load required data for Shapley value computation from external function
     merged_data, gene_names, regulatory_element_indices, transcription_factor_indices, shapley_values, transcription_factor_names, regulatory_element_names = load_shapley(chromosome, data_directory, output_directory)
 
-    from tqdm import tqdm  # Import tqdm for progress tracking
-
     # Iterate over each row in the merged data
-    for row_index in tqdm(range(merged_data.shape[0])):
+    for row_index in range(merged_data.shape[0]):
         current_index = merged_data.index[row_index]  # Get the current row's index
         
         # Check if Shapley values exist for the current index
@@ -1887,7 +1882,7 @@ def cis_shap_scNN(
     N: int = RE_TGlink1.shape[0]
 
     # Iterate over each RE-TG link to compute Shapley scores
-    for ii in tqdm(range(N)):
+    for ii in range(N):
 
         # Extract the Shapley values for the current RE-TG link
         AA0 = shap_all[ii]
@@ -1964,7 +1959,6 @@ def cis_reg(
             The function saves the results as a text file ('cell_population_cis_regulatory.txt') in the specified output directory.
     """
 
-    from tqdm import tqdm
     import pandas as pd
 
     # List of chromosome names ('chr1' to 'chr22' and 'chrX')
@@ -1974,7 +1968,7 @@ def cis_reg(
     # If the selected method is 'baseline', process using the 'cis_reg_chr' function
     if method == 'baseline':
         result = pd.DataFrame([])  # Initialize an empty DataFrame to store results
-        for i in tqdm(range(23)):  # Iterate over all chromosomes
+        for i in range(23):  # Iterate over all chromosomes
             chrN = chrom[i]  # Get the chromosome name
             temp = cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, outdir)  # Compute cis-regulatory interactions for the chromosome
             temp.columns = ['RE', 'TG', 'Score']  # Rename the columns
@@ -1983,7 +1977,7 @@ def cis_reg(
     # If the selected method is 'LINGER', process using the 'cis_shap' function
     elif method == 'LINGER':
         result = pd.DataFrame([])  # Initialize an empty DataFrame to store results
-        for i in tqdm(range(23)):  # Iterate over all chromosomes
+        for i in range(23):  # Iterate over all chromosomes
             chrN = chrom[i]  # Get the chromosome name
             temp = cis_shap(chrN, data_dir, outdir)  # Compute cis-regulatory interactions for the chromosome
             result = pd.concat([result, temp], axis=0, join='outer')  # Concatenate the results
@@ -2006,7 +2000,7 @@ def cis_reg(
         TFName = Exp.index
 
         result = pd.DataFrame([])  # Initialize an empty DataFrame to store results
-        for i in tqdm(range(len(chrlist))):  # Iterate over all chromosomes in the RE-TG link data
+        for i in range(len(chrlist)):  # Iterate over all chromosomes in the RE-TG link data
             chrN = chrlist[i]  # Get the chromosome name
             RE_TGlink1 = RE_TGlink[RE_TGlink['chr'] == chrN]  # Filter RE-TG links for the current chromosome
             temp = cis_shap_scNN(chrN, outdir, RE_TGlink1, REName, TFName)  # Compute Shapley values using scNN
@@ -2200,7 +2194,6 @@ def cell_type_specific_cis_reg(
 
     import pandas as pd
     import numpy as np
-    from tqdm import tqdm
 
     # Extract the labels (cell types) from the RNA-seq data
     label = adata_RNA.obs['label'].values.tolist()
@@ -2217,7 +2210,7 @@ def cell_type_specific_cis_reg(
             result = pd.DataFrame([])  # Initialize an empty DataFrame to store results
 
             # Iterate over all chromosomes
-            for i in tqdm(range(23)):
+            for i in range(23):
                 chrN = chrom[i]
                 temp = cell_type_specific_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, label0, outdir)
                 result = pd.concat([result, temp], axis=0, join='outer')
@@ -2235,7 +2228,7 @@ def cell_type_specific_cis_reg(
         result = pd.DataFrame([])  # Initialize an empty DataFrame to store results
 
         # Iterate over all chromosomes
-        for i in tqdm(range(23)):
+        for i in range(23):
             chrN = chrom[i]
             temp = cell_type_specific_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, celltype, outdir)
             result = pd.concat([result, temp], axis=0, join='outer')
@@ -2325,7 +2318,6 @@ def trans_shap_scNN(
     import ast
     import numpy as np
     import pandas as pd
-    from tqdm import tqdm
     import torch
 
     # Initialize lists to store target genes (TG), transcription factors (TF), and their Shapley scores
@@ -2343,7 +2335,7 @@ def trans_shap_scNN(
     N = RE_TGlink1.shape[0]
 
     # Iterate over each RE-TG link to compute Shapley scores
-    for ii in tqdm(range(N)):
+    for ii in range(N):
         # Extract the Shapley values for the current RE-TG link
         AA0 = shap_all[ii]
 
@@ -2638,7 +2630,7 @@ def trans_reg(
         S = pd.DataFrame([])
 
         # Iterate over all chromosomes in the RE-TG link data
-        for i in tqdm(range(len(chrlist))):
+        for i in range(len(chrlist)):
             # Get the current chromosome name
             chrN = chrlist[i]
 

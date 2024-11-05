@@ -378,7 +378,7 @@ def load_TFbinding(GRNdir: str, motifWeight: pd.DataFrame, Match2: np.ndarray, T
     chrall.append('chrX')
 
     # Loop over each chromosome and load motif binding data
-    for chrN in tqdm(chrall):
+    for chrN in chrall:
         # Load motif binding data for the current chromosome
         Motif_binding_temp1 = load_motifbinding_chr(chrN, GRNdir, motifWeight, outdir)
         
@@ -644,7 +644,7 @@ def preprocess(
             output_array: np.ndarray = np.empty([len(gene_list), 4], dtype=object)
 
             # Create a progress bar to track the loop
-            for i in tqdm(range(len(gene_list))):
+            for i in range(len(gene_list)):
                 selected_gene = gene_list[i]
                 output_array[i, :] = index_generate(selected_gene, merged_s, merged_b, tf_names)
 

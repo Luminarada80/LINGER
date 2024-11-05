@@ -28,3 +28,4 @@ grep
 /.idea/*
 *.pdf
 *.out
+BASH_LINGER/LOGS/

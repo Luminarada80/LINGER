@@ -998,7 +998,7 @@ def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
         netall = torch.load(GRNdir + 'all_models_' + chr + '.pt')
 
         # Loop through each gene in the current chromosome
-        for ii in tqdm(range(N)):
+        for ii in range(N):
             warnings.filterwarnings("ignore")
             
             # Perform scNN training and SHAP computation for the current gene
@@ -1127,7 +1127,7 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
             netall = torch.load(GRNdir + 'all_models_' + chrom + '.pt', map_location=device)
 
             # Loop through the genes in the chromosome
-            for ii in tqdm(range(N)):
+            for ii in range(N):
                 warnings.filterwarnings("ignore")
 
                 # Train the scNN model and compute SHAP values for the current gene
@@ -1183,7 +1183,7 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
         chrall=[RE_TGlink[0][i][0].split(':')[0] for i in range(RE_TGlink.shape[0])]
         RE_TGlink['chr']=chrall
         chrlist=RE_TGlink['chr'].unique()
-        for jj in tqdm(range(len(chrlist))):
+        for jj in range(len(chrlist)):
             chrtemp=chrlist[jj]
             RE_TGlink1=RE_TGlink[RE_TGlink['chr']==chrtemp]
             Lossall=np.zeros([RE_TGlink1.shape[0],100])

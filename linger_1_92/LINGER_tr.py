@@ -408,7 +408,7 @@ def training(GRNdir,method,outdir,data_dir,activef,species):
             fisherall = torch.load(GRNdir+'fisher_'+chr+'.pt')
             netall=torch.load(GRNdir+'all_models_'+chr+'.pt')
             
-            for ii in tqdm(range(N)):
+            for ii in range(N):
                 warnings.filterwarnings("ignore")
                 res=sc_nn(ii,gene_chr,TFindex,TFindex_bulk,REindex,REindex_bulk,REindex_bulk_match,Target,netall,adj_matrix_all,Exp,TF_match,input_size_all,fisherall,Opn,l1_lambda,fisher_w,activef)
                 warnings.resetwarnings()
@@ -456,7 +456,7 @@ def training(GRNdir,method,outdir,data_dir,activef,species):
             chrtemp=chrlist[jj]
             RE_TGlink1=RE_TGlink[RE_TGlink['chr']==chrtemp]
             Lossall=np.zeros([RE_TGlink1.shape[0],100])
-            for ii in  tqdm(range(RE_TGlink1.shape[0])):
+            for ii in  range(RE_TGlink1.shape[0]):
                 warnings.filterwarnings("ignore")
                 #res = Parallel(n_jobs=n_jobs)(delayed(sc_nn_NN)(ii,RE_TGlink_temp,Target,netall,Exp,Opn,l1_lambda,activef)  for ii in tqdm(range(RE_TGlink.shape[0]))
                 RE_TGlink_temp=RE_TGlink1.values[ii,:]
