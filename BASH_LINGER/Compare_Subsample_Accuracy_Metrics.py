@@ -10,7 +10,7 @@ sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELL
 import BASH_LINGER.shared_variables as shared_variables
 
 # Define the directory path where your CSV files are located
-directory_path = shared_variables.results_dir
+directory_path = f'{shared_variables.results_dir}/accuracy_metrics/'
 
 # Get all files ending with '_accuracy_metrics_summary.csv' in the specified directory
 accuracy_metric_files = glob.glob(os.path.join(directory_path, '*_accuracy_metrics_summary.csv'))
