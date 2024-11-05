@@ -69,7 +69,7 @@ CELL_POP = args.cell_pop  # Default False
 CELL_TYPE = args.cell_type
 SAMPLE_NUM = args.sample_num
 
-RESULT_DIR: str = f'{shared_variables.results_dir}/sample_{SAMPLE_NUM}/'
+RESULT_DIR: str = f'{shared_variables.results_dir}/70_percent_sample_{SAMPLE_NUM}/'
 
 if not os.path.exists(RESULT_DIR):
     os.makedirs(RESULT_DIR)
@@ -81,14 +81,14 @@ if CELL_POP == False:
     print(f'CELL_TYPE is set to "{CELL_TYPE}"')
 
 if CELL_POP == True:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_TF_RE_binding.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_cis_regulatory.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_population_trans_regulatory.txt'
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_TF_RE_binding.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_cis_regulatory.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_trans_regulatory.txt'
 
 elif CELL_POP == False:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}sample_{SAMPLE_NUM}/cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
 
     # Make sure that the cell type specific dataset is present
     os.makedirs(f'{RESULT_DIR}/{CELL_TYPE}', exist_ok=True)
@@ -197,7 +197,7 @@ def save_ground_truth_scores(tf_list: list, tg_list: list, value_list: list):
     return ground_truth_df
 
 
-def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame):
+def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFrame, ground_truth_df: pd.DataFrame, y_log: bool):
     """
     Plots a histogram of non-ground truth trans-regulatory potential scores compared to the ground truth scores.
     """
@@ -206,31 +206,39 @@ def plot_trans_reg_distribution(trans_reg_network_minus_ground_truth: pd.DataFra
     ground_truth_scores = ground_truth_df['Score'].dropna()
 
     # Plot histograms for the LINGER trans-reg network and ground truth network
-    plt.hist(linger_scores, bins=150, log=True, alpha=0.7, label='Non-ground truth scores')
-    plt.hist(ground_truth_scores, bins=150, log=True, alpha=0.7, label='Ground truth scores')
+    plt.hist(linger_scores, bins=150, log=y_log, alpha=0.7, label='Non-ground truth scores')
+    plt.hist(ground_truth_scores, bins=150, log=y_log, alpha=0.7, label='Ground truth scores')
 
     
     plt.rc('')
-    plt.ylabel('Frequency (log)')
+    if y_log == True:
+        plt.ylabel('Frequency (log)')
+    else:
+        plt.ylabel('Frequency')
+
     plt.xlabel('log2 LINGER trans-regulatory potential score')
     plt.legend()
 
     if CELL_POP == True:
         plt.title(f'Distribution of Cell Population TRP Scores')
         plt.tight_layout()
-        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution.png', dpi=300)
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution_ylog_{str(y_log)}.png', dpi=300)
     else:
         plt.title(f'Distribution of TRP Scores in {CELL_TYPE.capitalize()}')
         plt.tight_layout()
-        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution.png', dpi=300)
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution_ylog_{str(y_log)}.png', dpi=300)
     plt.close()
     logging.info("\nTrans-regulatory distribution plot saved to 'trans_reg_distribution.png'.")
 
 def plot_trans_reg_distribution_with_thresholds(
-    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame
+    ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame, y_log: bool
 ):
-    # Calculate thresholds
-    lower_threshold = ground_truth_df['Score'].quantile(0.05)
+    # Calculate mean and standard deviation of ground truth scores
+    gt_mean = ground_truth_df['Score'].mean()
+    gt_std = ground_truth_df['Score'].std()
+
+    # Define the lower threshold
+    lower_threshold = gt_mean - 2 * gt_std
 
     # Split data into TP, FP, TN, FN based on threshold
     tp_scores = ground_truth_df[ground_truth_df['Score'] >= lower_threshold]['Score']
@@ -240,25 +248,28 @@ def plot_trans_reg_distribution_with_thresholds(
 
     # Plot histograms for each category with different colors
     plt.figure(figsize=(10, 6))
-    plt.hist(tn_scores, bins=150, log=True, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    plt.hist(fp_scores, bins=150, log=True, alpha=1, color='#4195df', label='False Positive (FP)')
-    plt.hist(fn_scores, bins=150, log=True, alpha=1, color='#efc69f', label='False Negative (FN)')
-    plt.hist(tp_scores, bins=150, log=True, alpha=1, color='#dc8634', label='True Positive (TP)')
+    plt.hist(tn_scores, bins=150, log=y_log, alpha=1, color='#b6cde0', label='True Negative (TN)')
+    plt.hist(fp_scores, bins=150, log=y_log, alpha=1, color='#4195df', label='False Positive (FP)')
+    plt.hist(fn_scores, bins=150, log=y_log, alpha=1, color='#efc69f', label='False Negative (FN)')
+    plt.hist(tp_scores, bins=150, log=y_log, alpha=1, color='#dc8634', label='True Positive (TP)')
 
     # Plot threshold line
     plt.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2, label='Classification Threshold')
 
     # Add labels, title, and legend
     plt.xlabel('log2 LINGER trans-regulatory potential score')
-    plt.ylabel('Frequency (log scale)')
-    plt.title('Distribution of TRP Scores with Classification Labels')
+    if y_log == True:
+        plt.ylabel('Frequency (log)')
+    else:
+        plt.ylabel('Frequency')
+    plt.title('Distribution of TRP Scores with Accuracy Metric Labels')
     plt.legend(loc='upper left')
 
     # Save the plot
     if CELL_POP:
-        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution_classified.png', dpi=300)
+        plt.savefig(f'{RESULT_DIR}/cell_pop_trans_reg_distribution_threshold_ylog_{str(y_log)}.png', dpi=300)
     else:
-        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution_classified.png', dpi=300)
+        plt.savefig(f'{RESULT_DIR}/{CELL_TYPE}/trans_reg_distribution_threshold_ylog_{str(y_log)}.png', dpi=300)
 
     plt.close()
     logging.info("Trans-regulatory distribution plot with classification labels saved.")
@@ -453,8 +464,9 @@ def summarize_ground_truth_and_trans_reg(
     # Calculate threshold information for ground truth scores
     gt_mean = ground_truth_df['Score'].mean()
     gt_stdev = ground_truth_df['Score'].std()
+
     thresholds = {
-        'lower': round(ground_truth_df['Score'].quantile(0.05), decimal_places)
+        'lower': round(gt_mean - 2 * gt_stdev, decimal_places)
     }
 
     # Ensure result directory exists
@@ -491,7 +503,12 @@ def summarize_ground_truth_and_trans_reg(
         
 def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_ground_truth_df: pd.DataFrame):
     # Define the lower threshold
-    lower_threshold = ground_truth_df['Score'].quantile(0.05)
+    # Calculate mean and standard deviation of ground truth scores
+    gt_mean = ground_truth_df['Score'].mean()
+    gt_std = ground_truth_df['Score'].std()
+
+    # Define the lower threshold
+    lower_threshold = gt_mean - 2 * gt_std
 
     # Classify ground truth scores
     ground_truth_df['true_interaction'] = 1
@@ -572,7 +589,7 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
         log_and_write(file, f'\t- AUPRC: {pr_auc:.2f}')
     
     summary_dict = {
-        "cell_counts": [SAMPLE_NUM],
+        "sample": [SAMPLE_NUM],
         "precision": [precision],
         "recall": [recall],
         "specificity": [specificity],
@@ -600,7 +617,7 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     plt.ylabel('True Positive Rate')
     plt.title('ROC Curve for Trans-Regulatory Potential Score Classification')
     plt.legend(loc="lower right")
-    plt.grid()
+    plt.grid(visible=False)
 
     # Save the plot
     save_path = f'{RESULT_DIR}/AUC.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/AUC.png'
@@ -628,7 +645,7 @@ def plot_precision_recall_curve(
     plt.ylabel('Precision')
     plt.title('Precision-Recall Curve')
     plt.legend(loc='lower left')
-    plt.grid()
+    plt.grid(visible=False)
 
     # Save or show the plot
     save_path = f'{RESULT_DIR}/precision_recall_curve.png' if CELL_POP else f'{RESULT_DIR}/{CELL_TYPE}/precision_recall_curve.png'
@@ -785,11 +802,11 @@ def main():
 
     # ----- FIGURES -----
     # Histogram distribution of trans-regulatory potential scores and ground truth scores
-    plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df)
+    plot_trans_reg_distribution(trans_reg_minus_ground_truth_df, ground_truth_df, y_log=False)
 
     plot_precision_recall_curve(ground_truth_df, trans_reg_minus_ground_truth_df)
 
-    plot_trans_reg_distribution_with_thresholds(ground_truth_df, trans_reg_minus_ground_truth_df)
+    plot_trans_reg_distribution_with_thresholds(ground_truth_df, trans_reg_minus_ground_truth_df, y_log=False)
 
     # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
     plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)

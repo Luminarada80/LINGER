@@ -33,24 +33,24 @@ plt.figure(figsize=(12, 5))
 
 # Subplot 1: Precision-Recall Curves
 plt.subplot(1, 2, 1)
-for cell_count, pr_curve in pr_data:
-    plt.plot(pr_curve['recall'], pr_curve['precision'], label=f'{cell_count} cells')
+for sample, pr_curve in pr_data:
+    plt.plot(pr_curve['recall'], pr_curve['precision'], label=f'Subsample {sample}')
 plt.xlabel('Recall')
 plt.ylabel('Precision')
 plt.title('Precision-Recall Curves')
-plt.legend(loc='lower left')
-plt.grid()
+plt.grid(visible=False)
 
 # Subplot 2: ROC Curves
 plt.subplot(1, 2, 2)
-for cell_count, roc_curve in roc_data:
-    plt.plot(roc_curve['fpr'], roc_curve['tpr'], label=f'{cell_count} cells')
+for sample, roc_curve in roc_data:
+    plt.plot(roc_curve['fpr'], roc_curve['tpr'], label=f'Subsample {sample}')
 plt.plot([0, 1], [0, 1], 'k--')  # Diagonal line for random chance
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC Curves')
-plt.legend(loc='lower right')
-plt.grid()
+plt.grid(visible=False)
+
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
 # Save the combined plot
 plt.tight_layout()
@@ -58,25 +58,25 @@ plt.savefig(f'{shared_variables.results_dir}/AUROC_AUPRC_all_subsamples.png', dp
 plt.show()
 
 # Concatenate all accuracy metric DataFrames along rows, aligning by column names
-combined_accuracy_metric_df = pd.concat(accuracy_metric_dfs, ignore_index=True).sort_values(by='cell_counts').reset_index(drop=True)
+combined_accuracy_metric_df = pd.concat(accuracy_metric_dfs, ignore_index=True).sort_values(by='sample').reset_index(drop=True)
 
 # Display or save the combined DataFrame
 print(combined_accuracy_metric_df)
-combined_accuracy_metric_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics_by_cell_count.tsv', sep='\t', index=False)
+combined_accuracy_metric_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics_by_sample.tsv', sep='\t', index=False)
 
 # Plot each metric with adjusted y-axis limits
 plt.figure(figsize=(14, 6))
-for i, column in enumerate(combined_accuracy_metric_df.columns[1:], 1):  # Skip 'cell_counts' for plotting
+for i, column in enumerate(combined_accuracy_metric_df.columns[1:], 1):  # Skip 'sample' for plotting
     plt.subplot(2, 5, i)
-    plt.plot(combined_accuracy_metric_df['cell_counts'], combined_accuracy_metric_df[column], marker='o')
+    plt.plot(combined_accuracy_metric_df['sample'], combined_accuracy_metric_df[column], marker='o')
     plt.ylim((0, 1))  # Set the y-axis limits to (0,1)
     plt.title(column.capitalize())
-    plt.xlabel('Number of Cells')
-    plt.xticks(combined_accuracy_metric_df['cell_counts'], combined_accuracy_metric_df['cell_counts'])  # Set x-ticks to display 1000, 2000, etc.
+    plt.xlabel('70 percent subsample')
+    plt.xticks(combined_accuracy_metric_df['sample'], combined_accuracy_metric_df['sample'])  # Set x-ticks to display 1000, 2000, etc.
     plt.ylabel(column.capitalize())
     plt.grid()
 
 # Save the accuracy metrics plot
 plt.tight_layout()
-plt.savefig(f'{shared_variables.results_dir}/accuracy_metrics_by_cell_count.png', dpi=300)
+plt.savefig(f'{shared_variables.results_dir}/accuracy_metrics_by_sample.png', dpi=300)
 plt.show()

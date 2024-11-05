@@ -5,11 +5,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 
-import MESC_PIPELINE.shared_variables as shared_variables
+import BASH_LINGER.shared_variables as shared_variables
+
+SAMPLE_NUM = "1000"
 
 ADATA_RNA_PATH = f'{shared_variables.data_dir}/adata_RNA.h5ad'
-CHIP_SEQ_GROUND_TRUTH_PATH = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/PBMC_CISTROME_RESULTS/ground_truth_w_score.csv'
-OUTPUT_DIR = f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/data'
+CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.ground_truth_dir}/filtered_ground_truth_56TFs_3036TGs.csv'
+OUTPUT_DIR = shared_variables.output_dir
 
 SMALL_SIZE = 8
 MEDIUM_SIZE = 10
