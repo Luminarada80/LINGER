@@ -14,6 +14,10 @@ from sklearn.linear_model import ElasticNet
 from sklearn.datasets import make_regression
 from sklearn.model_selection import KFold
 import shap
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
 hidden_size  = 64
 hidden_size2 = 16
 output_size = 1
@@ -337,7 +341,7 @@ def RE_TG_dis(outdir, data_dir):
     import pandas as pd
     import pybedtools
     import numpy as np
-    print('Overlap the regions with gene loc ...')
+    logging.info('Overlap the regions with gene loc ...')
     import os# Create the directory
     current_directory = os.getcwd()
     os.makedirs(outdir, exist_ok=True)
@@ -392,7 +396,7 @@ def training(GRNdir,method,outdir,data_dir,activef,species):
             result=np.zeros([data_merge.shape[0],2])
             Lossall=np.zeros([data_merge.shape[0],100])
             chr=chrall[i]
-            print(chr)
+            logging.info(chr)
             idx_file1=GRNdir+chr+'_index.txt'
             idx_file_all=GRNdir+chr+'_index_all.txt'
             idx_bulk=pd.read_csv(idx_file1,header=None,sep='\t') 
@@ -452,7 +456,7 @@ def training(GRNdir,method,outdir,data_dir,activef,species):
         RE_TGlink['chr']=chrall
         chrlist=RE_TGlink['chr'].unique()
         for jj in range(len(chrlist)):
-            print(f'Processing chr{jj+1}')
+            logging.info(f'Processing chr{jj+1}')
             chrtemp=chrlist[jj]
             RE_TGlink1=RE_TGlink[RE_TGlink['chr']==chrtemp]
             Lossall=np.zeros([RE_TGlink1.shape[0],100])

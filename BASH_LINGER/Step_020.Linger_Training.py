@@ -1,6 +1,10 @@
 import sys
 import pandas as pd
 import argparse
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # Import the project directory to load the linger module
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
@@ -19,7 +23,7 @@ parser.add_argument("--activef", required=True, help="activation function to use
 
 args = parser.parse_args()
 
-print('Getting TSS')
+logging.info('Getting TSS')
 LINGER_tr.get_TSS(
     args.tss_motif_info_path,
     args.genome, 
@@ -27,7 +31,7 @@ LINGER_tr.get_TSS(
     args.output_dir # I altered the function to allow for a different output directory
     ) 
 
-print('Getting RE-TG distances')
+logging.info('Getting RE-TG distances')
 LINGER_tr.RE_TG_dis(args.output_dir, args.sample_data_dir)
 
 genomemap=pd.read_csv(args.tss_motif_info_path+'genome_map_homer.txt',sep='\t')
@@ -35,7 +39,7 @@ genomemap.index=genomemap['genome_short']
 species=genomemap.loc[args.genome]['species_ensembl']
 
 # Refines the bulk model by further training it on the single-cell data
-print(f'\nBeginning LINGER single cell training...')
+logging.info(f'\nBeginning LINGER single cell training...')
 LINGER_tr.training(
     args.tss_motif_info_path,
     args.method,
@@ -45,4 +49,4 @@ LINGER_tr.training(
     species
     )
 
-print(f'FINISHED TRAINING')
+logging.info(f'FINISHED TRAINING')
