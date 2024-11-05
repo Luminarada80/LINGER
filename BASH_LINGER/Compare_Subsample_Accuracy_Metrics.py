@@ -10,7 +10,7 @@ sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELL
 import BASH_LINGER.shared_variables as shared_variables
 
 # Define the directory path where your CSV files are located
-directory_path = f'{shared_variables.results_dir}/accuracy_metrics/'
+directory_path = f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/'
 
 # Get all files ending with '_accuracy_metrics_summary.csv' in the specified directory
 accuracy_metric_files = glob.glob(os.path.join(directory_path, '*_accuracy_metrics_summary.csv'))
@@ -54,7 +54,7 @@ plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
 # Save the combined plot
 plt.tight_layout()
-plt.savefig(f'{shared_variables.results_dir}/AUROC_AUPRC_all_subsamples.png', dpi=300)
+plt.savefig(f'{shared_variables.results_dir}/accuracy_metrics/AUROC_AUPRC_all_subsamples.png', dpi=300)
 plt.show()
 
 # Concatenate all accuracy metric DataFrames along rows, aligning by column names
@@ -62,7 +62,7 @@ combined_accuracy_metric_df = pd.concat(accuracy_metric_dfs, ignore_index=True).
 
 # Display or save the combined DataFrame
 print(combined_accuracy_metric_df)
-combined_accuracy_metric_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics_by_sample.tsv', sep='\t', index=False)
+combined_accuracy_metric_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/accuracy_metrics_by_sample.tsv', sep='\t', index=False)
 
 # Plot each metric with adjusted y-axis limits
 plt.figure(figsize=(14, 6))
@@ -78,5 +78,5 @@ for i, column in enumerate(combined_accuracy_metric_df.columns[1:], 1):  # Skip 
 
 # Save the accuracy metrics plot
 plt.tight_layout()
-plt.savefig(f'{shared_variables.results_dir}/accuracy_metrics_by_sample.png', dpi=300)
+plt.savefig(f'{shared_variables.results_dir}/accuracy_metrics/accuracy_metrics_by_sample.png', dpi=300)
 plt.show()

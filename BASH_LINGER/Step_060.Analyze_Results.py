@@ -544,11 +544,11 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     }
 
     # Create a directory in the results_dir to store the individual accuracy, PR curve, and ROC curve files
-    if not os.path.exists(f'{shared_variables.results_dir}/accuracy_metrics/'):
-        os.makedirs(f'{shared_variables.results_dir}/accuracy_metrics/')
+    if not os.path.exists(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/'):
+        os.makedirs(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/')
 
     roc_curve_df = pd.DataFrame(roc_curve_dict)
-    roc_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/{SAMPLE_NUM}_roc_curve_df.csv', index=False)
+    roc_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_roc_curve_df.csv', index=False)
 
     roc_auc = auc(fpr, tpr)
 
@@ -615,7 +615,7 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     summary_df = pd.DataFrame(summary_dict)
 
     # Save the more easily-parsable format
-    summary_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/{SAMPLE_NUM}_accuracy_metrics_summary.csv', index=False)
+    summary_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_accuracy_metrics_summary.csv', index=False)
 
     # Plotting the ROC Curve
     plt.figure(figsize=(8, 6))
@@ -668,7 +668,7 @@ def plot_precision_recall_curve(
     }
 
     pr_curve_df = pd.DataFrame(pr_curve_dict)
-    pr_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/{SAMPLE_NUM}_pr_curve_df.csv', index=False)
+    pr_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_pr_curve_df.csv', index=False)
 
     return pr_auc
 
