@@ -21,8 +21,6 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
-CHIP_SEQ_GROUND_TRUTH_PATH = f'{shared_variables.ground_truth_dir}/filtered_ground_truth_56TFs_3036TGs.csv'
-
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
     'mESC': 'all',
@@ -32,6 +30,24 @@ CELL_TYPE_TF_DICT: dict = {
 # Allows the user to input whether they want to analyze the cell population or cell type results
 def parse_args():
     parser = argparse.ArgumentParser(description="Process TF-TG pairs with cell type specificity.")
+    parser.add_argument(
+        "--result_dir",
+        type=str,
+        required=True,
+        help="Directory to store analysis results in"
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Directory to LINGER output results in"
+    )
+    parser.add_argument(
+        "--ground_truth_path",
+        type=str,
+        required=True,
+        help="Directory to the ground truth data file"
+    )
     parser.add_argument(
         "--cell_pop",
         action="store_true",
@@ -68,8 +84,9 @@ args = parse_args()
 CELL_POP = args.cell_pop  # Default False
 CELL_TYPE = args.cell_type
 SAMPLE_NUM = args.sample_num
-
-RESULT_DIR: str = f'{shared_variables.results_dir}/70_percent_sample_{SAMPLE_NUM}/'
+RESULT_DIR = args.result_dir
+OUTPUT_DIR = args.output_dir
+GROUND_TRUTH_PATH = args.ground_truth_path
 
 # Define the summary file path
 SUMMARY_FILE_PATH = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
@@ -84,14 +101,14 @@ if CELL_POP == False:
     print(f'CELL_TYPE is set to "{CELL_TYPE}"')
 
 if CELL_POP == True:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_TF_RE_binding.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_cis_regulatory.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_population_trans_regulatory.txt'
+    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}cell_population_TF_RE_binding.txt'
+    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_population_cis_regulatory.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_population_trans_regulatory.txt'
 
 elif CELL_POP == False:
-    TF_RE_BINDING_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
-    CIS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{shared_variables.output_dir}70_percent_sample_{SAMPLE_NUM}/cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
 
     # Make sure that the cell type specific dataset is present
     os.makedirs(f'{RESULT_DIR}/{CELL_TYPE}', exist_ok=True)
@@ -124,7 +141,7 @@ def load_data():
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth: pd.DataFrame = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=',', header=0, index_col=0)
+    ground_truth: pd.DataFrame = pd.read_csv(GROUND_TRUTH_PATH, sep=',', header=0, index_col=0)
     return ground_truth
 
 
@@ -700,8 +717,6 @@ def main():
 
     # Process the TF-TG pairs and retrieve scores from the trans-regulatory network
     tf_list, tg_list, value_list, num_nan = process_tf_tg_pairs(ground_truth, trans_reg_network)
-
-    print(f'TFs: {set(tf_list)}')
 
     # Save the processed ground truth scores
     ground_truth_df = save_ground_truth_scores(tf_list, tg_list, value_list)
