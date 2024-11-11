@@ -3,7 +3,11 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 import numpy as np
 from copy import deepcopy
+import os
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
+
+# Temporarily disable SettingWithCopyWarning
+pd.options.mode.chained_assignment = None
 
 # Set font to Arial and adjust font sizes
 rcParams.update({
@@ -74,7 +78,8 @@ def separate_ground_truth_from_inferred(ground_truth: pd.DataFrame, inferred_net
 def calculate_and_plot_auroc_auprc(
     ground_truth_with_scores: pd.DataFrame,
     cell_oracle_subset: pd.DataFrame,
-    linger_network_subset: pd.DataFrame
+    linger_network_subset: pd.DataFrame,
+    result_dir: str
     ):
     """Plots the AUROC and AUPRC"""
     
@@ -157,11 +162,11 @@ def calculate_and_plot_auroc_auprc(
 
     # Adjust layout and display the figure
     fig.tight_layout()
-    plt.savefig('combined_auroc_auprc_figure.png', dpi=200)
+    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_auroc_auprc.png', dpi=200)
     plt.show()
 
 
-def plot_histogram(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame):
+def plot_histogram(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
     # Define the figure and two subplots
     plt.figure(figsize=(18, 8))
 
@@ -184,10 +189,10 @@ def plot_histogram(ground_truth_with_scores: pd.DataFrame, linger_network_subset
 
     # Adjust layout and show the plot
     plt.tight_layout()
-    plt.savefig('dataset_histograms.png')
+    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histograms.png')
     
 
-def plot_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame):
+def plot_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
     
     def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, score_col: str):
     
@@ -253,15 +258,20 @@ def plot_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linge
 
     # Adjust layout and save the plot
     plt.tight_layout()
-    plt.savefig('threshold_dataset_histograms.png')
+    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histogram_with_accuracy_threshold.png')
 
 
 if __name__ == '__main__':
 
     # Load the datasets
-    cell_oracle_network = pd.read_csv('inferred_grns/cell_oracle_5000_cell.csv')
-    linger_network = pd.read_csv('inferred_grns/linger_5000_cell.csv', index_col=0)
-    ground_truth = pd.read_csv('inferred_grns/filtered_ground_truth_56TFs_3036TGs.csv', sep=',', header=0, index_col=0)
+    cell_oracle_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/Celloracle/DS_014_mESC/Inferred_GRN/5000cells_E7.5_rep1_final_GRN.csv')
+    linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/LINGER/5000_cell_type_TF_gene.csv', index_col=0)
+    ground_truth = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/filtered_ground_truth_56TFs_3036TGs.csv', sep=',', header=0, index_col=0)
+    
+    result_dir = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS/comparing_methods'
+    
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
 
     # Make sure the gene names are capitalized for the ground truth
     ground_truth['Source'] = ground_truth['Source'].str.upper().str.strip()
@@ -289,13 +299,13 @@ if __name__ == '__main__':
     
     # Calculate the AUROC and AUPRC
     print('Calculating AUROC and AUPRC')
-    calculate_and_plot_auroc_auprc(ground_truth_with_scores, oracle_network_subset, linger_network_subset)
+    calculate_and_plot_auroc_auprc(ground_truth_with_scores, oracle_network_subset, linger_network_subset, result_dir)
     
     # Plot the histogram of expression values
     print('Creating histogram of inferred network scores')
-    plot_histogram(ground_truth_with_scores, linger_network_subset, oracle_network_subset)
+    plot_histogram(ground_truth_with_scores, linger_network_subset, oracle_network_subset, result_dir)
     
     # Plot the histogram of expression values with the accuracy metric cutoffs
     print('Creating histogram of inferred network scores with accuracy metric cutoffs')
-    plot_histogram_with_thresholds(ground_truth_with_scores, linger_network_subset, oracle_network_subset)
+    plot_histogram_with_thresholds(ground_truth_with_scores, linger_network_subset, oracle_network_subset, result_dir)
     
