@@ -5,6 +5,9 @@ import numpy as np
 from copy import deepcopy
 import os
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
+import logging
+
+
 
 # Temporarily disable SettingWithCopyWarning
 pd.options.mode.chained_assignment = None
@@ -21,13 +24,67 @@ rcParams.update({
 })
 
 
-def create_standard_dataframe(old_df: pd.DataFrame, source_col: str, target_col: str, score_col: str):
+def create_standard_dataframe(old_df: pd.DataFrame, source_col=None, target_col=None, score_col=None):
     """Standardizes the column names and capitalizes the gene names"""
+
+    # Capitalize the column names for consistency
+    old_df.columns = old_df.columns.str.capitalize()
     
-    new_df = pd.DataFrame(columns=["Source", "Target", "Score"])
-    new_df["Source"] = old_df[source_col].str.upper().str.strip()
-    new_df["Target"] = old_df[target_col].str.upper().str.strip()
-    new_df["Score"] = old_df[score_col]
+    
+    # Detect if the DataFrame needs to be melted
+    if "Source" in old_df.columns and "Target" in old_df.columns:
+        # print("\nDataFrame appears to be in long format; no melting is required.")
+        
+        source_col = source_col.capitalize() or old_df.columns[0].capitalize()
+        target_col = target_col.capitalize() or old_df.columns[1].capitalize()
+        score_col = score_col.capitalize() or old_df.columns[2].capitalize()
+        
+        logging.info(f'\tThere are {len(set(old_df[source_col]))} TFs, {len(set(old_df[target_col]))} TGs, and {len(old_df[source_col])} edges')
+        
+        # If no melting is required, we just rename columns directly
+        melted_df = old_df.rename(columns={source_col: "Source", target_col: "Target", score_col: "Score"})
+    
+    # The dataframe needs to be melted, there are more than 3 columns and no "Source" or "Target" columns
+    elif old_df.shape[1] > 3:
+        
+        num_rows, num_cols = old_df.shape
+        
+        logging.debug(f'Original dataframe has {num_rows} rows and {num_cols} columns')
+        
+        logging.debug(f'\nOld df before melting:')
+        logging.debug(old_df.head())
+        
+        # TFs are columns, TGs are rows
+        if num_rows >= num_cols:
+            logging.info(f'\tThere are {num_cols} TFs, {num_rows} TGs, and {num_cols * num_rows} edges')
+            # Transpose the columns and rows to prepare for melting
+            old_df = old_df.T
+            
+            # Reset the index to make the TFs a column named 'Source'
+            old_df = old_df.reset_index()
+            old_df = old_df.rename(columns={'index': 'Source'})  # Rename the index column to 'Source'
+    
+            melted_df = old_df.melt(id_vars="Source", var_name="Target", value_name="Score")
+            
+        # TFs are rows, TGs are columns
+        elif num_cols > num_rows:
+            logging.info(f'\tThere are {num_rows} TFs, {num_cols} TGs, and {num_cols * num_rows} edges')
+            
+            # Reset the index to make the TFs a column named 'Source'
+            old_df = old_df.reset_index()
+            old_df = old_df.rename(columns={'index': 'Source'})  # Rename the index column to 'Source'
+    
+            melted_df = old_df.melt(id_vars="Source", var_name="Target", value_name="Score")
+
+    # Capitalize and strip whitespace for consistency
+    melted_df["Source"] = melted_df["Source"].str.upper().str.strip()
+    melted_df["Target"] = melted_df["Target"].str.upper().str.strip()
+
+    # Select and order columns as per new standard
+    new_df = melted_df[["Source", "Target", "Score"]]
+    
+    logging.debug(f'\nNew df after standardizing:')
+    logging.debug(new_df.head())
     
     return new_df
 
@@ -262,10 +319,14 @@ def plot_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linge
 
 
 if __name__ == '__main__':
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(message)s')   
 
     # Load the datasets
     cell_oracle_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/Celloracle/DS_014_mESC/Inferred_GRN/5000cells_E7.5_rep1_final_GRN.csv')
-    linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/LINGER/5000_cell_type_TF_gene.csv', index_col=0)
+    # linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/LINGER/5000_cell_type_TF_gene.csv', index_col=0)
+    linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL/sample_5000/cell_type_specific_trans_regulatory_mESC.txt', sep='\t', index_col=0, header=0)
     ground_truth = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/filtered_ground_truth_56TFs_3036TGs.csv', sep=',', header=0, index_col=0)
     
     result_dir = '/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS/comparing_methods'
