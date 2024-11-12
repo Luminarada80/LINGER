@@ -1,6 +1,8 @@
 import logging
 import pandas as pd
 from typing import TextIO
+from sklearn.metrics import confusion_matrix
+import numpy as np
 
 from matplotlib import rcParams
 
@@ -211,6 +213,9 @@ def remove_ground_truth_edges_from_inferred(
         inferred_network_no_ground_truth (pd.DataFrame):
             The inferred GRN without the ground truth scores
     """
+    # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
+    source_target_cols_uppercase(ground_truth_df)
+    source_target_cols_uppercase(inferred_network_df)
     
     # Get a list of the ground truth edges to separate 
     ground_truth_edges = set(zip(ground_truth_df['Source'], ground_truth_df['Target']))
@@ -221,3 +226,71 @@ def remove_ground_truth_edges_from_inferred(
     ]
     
     return inferred_network_no_ground_truth
+
+
+def calculate_accuracy_metrics(
+    ground_truth_df: pd.DataFrame,
+    inferred_network: pd.DataFrame,
+    lower_threshold, num_edges: int,
+    summary_file_path: str
+    ):
+    
+    # Classify ground truth scores
+    ground_truth_df['true_interaction'] = 1
+    ground_truth_df['predicted_interaction'] = np.where(
+        ground_truth_df['Score'] >= lower_threshold, 1, 0)
+
+    # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
+    inferred_network['true_interaction'] = 0
+    inferred_network['predicted_interaction'] = np.where(
+        inferred_network['Score'] >= lower_threshold, 1, 0)
+
+    # Concatenate dataframes for AUC and further analysis
+    auc_df = pd.concat([ground_truth_df, inferred_network])
+
+    # Calculate the confusion matrix
+    y_true = auc_df['true_interaction']
+    y_pred = auc_df['predicted_interaction']
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    
+    # Calculations for accuracy metrics
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    jaccard_index = tp / (tp + fp + fn)
+
+    # Weighted Jaccard Index
+    weighted_tp = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 1, 'Score'].sum()
+    weighted_fp = inferred_network.loc[inferred_network['predicted_interaction'] == 1, 'Score'].sum()
+    weighted_fn = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 0, 'Score'].sum()
+    weighted_jaccard_index = weighted_tp / (weighted_tp + weighted_fp + weighted_fn)
+    
+    # Early Precision Rate for top 1000 predictions
+    top_edges = auc_df.nlargest(int(num_edges), 'Score')
+    early_tp = top_edges[top_edges['true_interaction'] == 1].shape[0]
+    early_fp = top_edges[top_edges['true_interaction'] == 0].shape[0]
+    early_precision_rate = early_tp / (early_tp + early_fp)
+    
+    accuracy_metrics = {
+        'tp': tp,
+        'tn': tn,
+        'fp': fp,
+        'fn': fn,
+        'y_true': y_true,
+        'y_pred': y_pred
+        }
+    
+    summary_dict = {
+        "precision": precision,
+        "recall": recall,
+        "specificity": specificity,
+        "accuracy": accuracy,
+        "f1_score": f1_score,
+        "jaccard_index": jaccard_index,
+        "weighted_jaccard_index": weighted_jaccard_index,
+        "early_precision_rate": early_precision_rate,
+    }
+    
+    return summary_dict, accuracy_metrics

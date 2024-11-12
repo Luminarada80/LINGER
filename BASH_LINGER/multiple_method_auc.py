@@ -89,25 +89,6 @@ def create_standard_dataframe(old_df: pd.DataFrame, source_col=None, target_col=
     
     return new_df
 
-
-def remove_ground_truth_edges_from_inferred(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame):
-    """
-    Removes ground truth edges from the inferred network after setting the ground truth scores.
-    
-    After this step, the inferred network does not contain any ground truth edge scores. This way, the 
-    inferred network and ground truth network scores can be compared.
-    """
-    
-    # Get a list of the ground truth edges to separate 
-    ground_truth_edges = set(zip(ground_truth['Source'], ground_truth['Target']))
-    
-    # Create a new dataframe without the ground truth edges
-    inferred_network_separated = inferred_network[
-        ~inferred_network.apply(lambda row: (row['Source'], row['Target']) in ground_truth_edges, axis=1)
-    ]
-    
-    return inferred_network_separated
-
 def calculate_accuracy_metrics(ground_truth_df: pd.DataFrame, inferred_network: pd.DataFrame, lower_threshold, num_edges: int, summary_file_path: str):
     # Classify ground truth scores
     ground_truth_df['true_interaction'] = 1
@@ -530,7 +511,6 @@ if __name__ == '__main__':
 
     # Load the datasets
     cell_oracle_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/Celloracle/DS_014_mESC/Inferred_GRN/5000cells_E7.5_rep1_final_GRN.csv')
-    # linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/LINGER/5000_cell_type_TF_gene.csv', index_col=0)
     linger_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL/sample_5000/cell_type_specific_trans_regulatory_mESC.txt', sep='\t', index_col=0, header=0)
     ground_truth = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/RN111.tsv', sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
     
@@ -564,10 +544,11 @@ if __name__ == '__main__':
     
     # Remove ground truth edges from the inferred network
     print('Removing ground truth edges from the inferred network')
-    linger_no_ground_truth = remove_ground_truth_edges_from_inferred(ground_truth, linger_network_subset)
-    oracle_no_ground_truth = remove_ground_truth_edges_from_inferred(ground_truth, oracle_network_subset)
+    linger_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, linger_network_subset)
+    oracle_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, oracle_network_subset)
     
-    print('Calculating accuracy metrics using threshold of top 1000, 2000, 3000, 4000, and 5000 edges')
+    # Calculate the accuracy metrics with a sliding threshold based on the top 10,000 - 50,000 edges
+    print('Calculating accuracy metrics using threshold of top 10000, 20000, 30000, 40000, and 50000 edges')
     calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir)
     
     # Calculate the AUROC and AUPRC
