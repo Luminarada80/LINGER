@@ -7,7 +7,7 @@ import os
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
 import logging
 
-
+import helper_functions
 
 # Temporarily disable SettingWithCopyWarning
 pd.options.mode.chained_assignment = None
@@ -89,28 +89,14 @@ def create_standard_dataframe(old_df: pd.DataFrame, source_col=None, target_col=
     return new_df
 
 
-def find_ground_truth_scores_from_inferred(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, score_column_name: str):
-    """Merges the inferred network scores with the ground truth dataframe"""
-    ground_truth_with_scores = pd.merge(
-        ground_truth, 
-        inferred_network[['Source', 'Target', 'Score']], 
-        left_on=['Source', 'Target'], 
-        right_on=['Source', 'Target'], 
-        how='left'
-    ).rename(columns={'Score': score_column_name})
-
-    
-    return ground_truth_with_scores
-
-
 def only_keep_shared_genes(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame):
-    """Removes any TFs and TGs that are not in the ground truth from the inferred network"""
+    """Only keeps inferred network TFs and TGs that are also in the ground truth network"""
+    
     # Extract unique TFs and TGs from the ground truth network
     ground_truth_tfs = set(ground_truth['Source'])
     ground_truth_tgs = set(ground_truth['Target'])
-    ground_truth_edges = set(zip(ground_truth['Source'], ground_truth['Target']))
     
-    # Subset cell_oracle_network to contain only rows with TFs and TGs in ground_truth
+    # Subset cell_oracle_network to contain only rows with TFs and TGs in the ground_truth
     inferred_network_subset = inferred_network[
         (inferred_network['Source'].isin(ground_truth_tfs)) &
         (inferred_network['Target'].isin(ground_truth_tgs))
@@ -119,12 +105,18 @@ def only_keep_shared_genes(ground_truth: pd.DataFrame, inferred_network: pd.Data
     return inferred_network_subset
 
 
-def separate_ground_truth_from_inferred(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame):
-    """Removes ground truth edges from the inferred, so the inferred only contains true negative values"""
+def remove_ground_truth_edges_from_inferred(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame):
+    """
+    Removes ground truth edges from the inferred network after setting the ground truth scores.
+    
+    After this step, the inferred network does not contain any ground truth edge scores. This way, the 
+    inferred network and ground truth network scores can be compared.
+    """
     
     # Get a list of the ground truth edges to separate 
     ground_truth_edges = set(zip(ground_truth['Source'], ground_truth['Target']))
     
+    # Create a new dataframe without the ground truth edges
     inferred_network_separated = inferred_network[
         ~inferred_network.apply(lambda row: (row['Source'], row['Target']) in ground_truth_edges, axis=1)
     ]
@@ -340,13 +332,13 @@ if __name__ == '__main__':
     
     # Standardize the format of the two inferred networks and capitalize gene names
     print('Standardizing the format of the network dataframes')
-    linger_df = create_standard_dataframe(linger_network, "Source", "Target", "Score")
-    oracle_df = create_standard_dataframe(cell_oracle_network, "source", "target", "coef_mean")
+    linger_df = helper_functions.create_standard_dataframe(linger_network)
+    oracle_df = helper_functions.create_standard_dataframe(cell_oracle_network, score_col="coef_mean")
     
     # Find the inferred network scores for the ground truth edges
     print('Finding ground truth scores')
-    ground_truth_with_oracle_scores = find_ground_truth_scores_from_inferred(ground_truth, oracle_df, "Oracle_Score")
-    ground_truth_with_scores = find_ground_truth_scores_from_inferred(ground_truth_with_oracle_scores, linger_df, "Linger_Score")
+    ground_truth_with_oracle_scores = helper_functions.find_ground_truth_scores_from_inferred(ground_truth, oracle_df, "Oracle_Score")
+    ground_truth_with_scores = helper_functions.find_ground_truth_scores_from_inferred(ground_truth_with_oracle_scores, linger_df, "Linger_Score")
     
     # Subset the inferred dataset to only keep TFs and TGs that are shared between the inferred network and the ground truth
     print('Removing any TFs and TGs not found in the ground truth network')
@@ -355,8 +347,8 @@ if __name__ == '__main__':
     
     # Remove ground truth edges from the inferred network
     print('Removing ground truth edges from the inferred network')
-    linger_no_ground_truth = separate_ground_truth_from_inferred(ground_truth, linger_network_subset)
-    oracle_no_ground_truth = separate_ground_truth_from_inferred(ground_truth, oracle_network_subset)
+    linger_no_ground_truth = remove_ground_truth_edges_from_inferred(ground_truth, linger_network_subset)
+    oracle_no_ground_truth = remove_ground_truth_edges_from_inferred(ground_truth, oracle_network_subset)
     
     # Calculate the AUROC and AUPRC
     print('Calculating AUROC and AUPRC')
