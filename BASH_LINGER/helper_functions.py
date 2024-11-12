@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+from typing import TextIO
 
 from matplotlib import rcParams
 
@@ -16,6 +17,21 @@ rcParams.update({
     'ytick.labelsize': 14,  # Y-axis tick label size
     'legend.fontsize': 14  # Legend font size
 })
+
+def log_and_write(file: TextIO, message: str) -> None:
+    """
+    Helper function for logging and writing a message to a file.
+    
+    Parameters:
+        file (TextIO): An open file object where the message will be written.
+        message (str): The message to be logged and written to the file.
+    """
+    logging.info(message)
+    file.write(message + '\n')
+
+def source_target_cols_uppercase(df: pd.DataFrame):
+    df["Source"] = df["Source"].str.upper()
+    df["Target"] = df["Target"].str.upper()
 
 def create_standard_dataframe(
     inferred_network_df: pd.DataFrame,
@@ -96,8 +112,7 @@ def create_standard_dataframe(
             melted_df = inferred_network_df.melt(id_vars="Source", var_name="Target", value_name="Score")
 
     # Capitalize and strip whitespace for consistency
-    melted_df["Source"] = melted_df["Source"].str.upper().str.strip()
-    melted_df["Target"] = melted_df["Target"].str.upper().str.strip()
+    source_target_cols_uppercase(melted_df)
 
     # Select and order columns as per new standard
     standardized_df = melted_df[["Source", "Target", "Score"]]
@@ -108,8 +123,8 @@ def create_standard_dataframe(
     return standardized_df
 
 def find_ground_truth_scores_from_inferred(
-    ground_truth: pd.DataFrame,
-    inferred_network: pd.DataFrame,
+    ground_truth_df: pd.DataFrame,
+    inferred_network_df: pd.DataFrame,
     score_column_name: str = "Score"
     ) -> pd.DataFrame:
     
@@ -117,10 +132,10 @@ def find_ground_truth_scores_from_inferred(
     Merges the inferred network scores with the ground truth dataframe
     
     Parameters:
-        ground_truth (pd.DataFrame):
+        ground_truth_df (pd.DataFrame):
             The ground truth dataframe. Columns should be "Source" and "Target"
             
-        inferred_network (pd.DataFrame):
+        inferred_network_df (pd.DataFrame):
             The inferred GRN dataframe. Columns should be "Source", "Target", and "Score"
         
         score_column_name (str):
@@ -128,16 +143,13 @@ def find_ground_truth_scores_from_inferred(
     
     """
     # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
-    ground_truth["Source"] = ground_truth["Source"].str.upper()
-    ground_truth["Target"] = ground_truth["Target"].str.upper()
-    
-    inferred_network["Source"] = inferred_network["Source"].str.upper()
-    inferred_network["Target"] = inferred_network["Target"].str.upper()
+    source_target_cols_uppercase(ground_truth_df)
+    source_target_cols_uppercase(inferred_network_df)
     
     # Take the Source and Target from the ground truth and the Score from the inferred network to create a new df
     ground_truth_with_scores = pd.merge(
-        ground_truth, 
-        inferred_network[["Source", "Target", "Score"]], 
+        ground_truth_df, 
+        inferred_network_df[["Source", "Target", "Score"]], 
         left_on=["Source", "Target"], 
         right_on=["Source", "Target"], 
         how="left"
@@ -145,3 +157,67 @@ def find_ground_truth_scores_from_inferred(
 
     
     return ground_truth_with_scores
+
+def remove_tf_tg_not_in_ground_truth(
+    ground_truth_df: pd.DataFrame,
+    inferred_network_df: pd.DataFrame
+    ) -> pd.DataFrame:
+    
+    """
+    Only keeps inferred network TFs and TGs that are also in the ground truth network.
+    
+    Parameters:
+        ground_truth_df (pd.DataFrame):
+            Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
+        
+        inferred_network_df (pd.DataFrame):
+            The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
+    
+    """
+    # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
+    source_target_cols_uppercase(ground_truth_df)
+    source_target_cols_uppercase(inferred_network_df)
+    
+    # Extract unique TFs and TGs from the ground truth network
+    ground_truth_tfs = set(ground_truth_df['Source'])
+    ground_truth_tgs = set(ground_truth_df['Target'])
+    
+    # Subset cell_oracle_network to contain only rows with TFs and TGs in the ground_truth
+    aligned_inferred_network = inferred_network_df[
+        (inferred_network_df['Source'].isin(ground_truth_tfs)) &
+        (inferred_network_df['Target'].isin(ground_truth_tgs))
+    ]
+    
+    return aligned_inferred_network
+
+def remove_ground_truth_edges_from_inferred(
+    ground_truth_df: pd.DataFrame,
+    inferred_network_df: pd.DataFrame
+    ) -> pd.DataFrame:
+    """
+    Removes ground truth edges from the inferred network after setting the ground truth scores.
+    
+    After this step, the inferred network does not contain any ground truth edge scores. This way, the 
+    inferred network and ground truth network scores can be compared.
+    
+    Parameters:
+        ground_truth_df (pd.DataFrame):
+            Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
+        
+        inferred_network_df (pd.DataFrame):
+            The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
+
+    Returns:
+        inferred_network_no_ground_truth (pd.DataFrame):
+            The inferred GRN without the ground truth scores
+    """
+    
+    # Get a list of the ground truth edges to separate 
+    ground_truth_edges = set(zip(ground_truth_df['Source'], ground_truth_df['Target']))
+    
+    # Create a new dataframe without the ground truth edges
+    inferred_network_no_ground_truth = inferred_network_df[
+        ~inferred_network_df.apply(lambda row: (row['Source'], row['Target']) in ground_truth_edges, axis=1)
+    ]
+    
+    return inferred_network_no_ground_truth
