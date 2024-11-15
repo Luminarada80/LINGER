@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 from typing import TextIO
 from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib import rcParams
@@ -232,7 +233,6 @@ def calculate_accuracy_metrics(
     ground_truth_df: pd.DataFrame,
     inferred_network: pd.DataFrame,
     lower_threshold, num_edges: int,
-    summary_file_path: str
     ):
     
     # Classify ground truth scores
@@ -274,10 +274,10 @@ def calculate_accuracy_metrics(
     early_precision_rate = early_tp / (early_tp + early_fp)
     
     accuracy_metrics = {
-        'tp': tp,
-        'tn': tn,
-        'fp': fp,
-        'fn': fn,
+        'true_positive': tp,
+        'true_negative': tn,
+        'false_positive': fp,
+        'false_negative': fn,
         'y_true': y_true,
         'y_pred': y_pred
         }
@@ -294,3 +294,119 @@ def calculate_accuracy_metrics(
     }
     
     return summary_dict, accuracy_metrics
+
+def plot_multiple_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
+    
+    def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, score_col: str):
+    
+        # Set the ground truth and inferred network scores to log2 scale
+        inferred_network["Score"] = np.log2(inferred_network["Score"])
+        ground_truth[score_col] = np.log2(ground_truth[score_col])
+        
+        # Set the threshold for the accuracy metrics based on the ground truth mean
+        mean = ground_truth[score_col].mean()
+        std = ground_truth[score_col].std()
+        
+        threshold = mean - 1 * std
+        
+        tp = ground_truth[ground_truth[score_col] >= threshold][score_col]
+        fn = ground_truth[ground_truth[score_col] < threshold][score_col]
+        
+        fp = inferred_network[inferred_network["Score"] >= threshold]["Score"]
+        tn = inferred_network[inferred_network["Score"] < threshold]["Score"]
+        
+        return tp, fp, tn, fn, threshold
+    
+    tp_oracle, fp_oracle, tn_oracle, fn_oracle, oracle_threshold = find_inferred_network_accuracy_metrics(
+        ground_truth_with_scores, cell_oracle_subset, "Oracle_Score"
+        )
+    
+    tp_linger, fp_linger, tn_linger, fn_linger, linger_threshold = find_inferred_network_accuracy_metrics(
+        ground_truth_with_scores, linger_network_subset, "Linger_Score"
+        )
+    
+    plt.figure(figsize=(18, 8))
+    
+    # Plot the Oracle_Score histogram
+    plt.subplot(1, 2, 1)
+
+    # Plot histograms for Oracle Score categories with calculated bin sizes
+    plt.hist(tn_oracle, bins=75, alpha=1, color='#b6cde0', label='True Negative (TN)')
+    plt.hist(fp_oracle, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
+    plt.hist(fn_oracle, bins=75, alpha=1, color='#efc69f', label='False Negative (FN)')
+    plt.hist(tp_oracle, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
+
+    
+    # Plot Oracle threshold line
+    plt.axvline(x=oracle_threshold, color='black', linestyle='--', linewidth=2)
+    plt.title("CellOracle Score Distribution")
+    plt.xlabel("log2 CellOracle Score")
+    plt.ylabel("Frequency")
+
+    # Plot the Linger_Score histogram
+    plt.subplot(1, 2, 2)
+
+    # Plot histograms for Linger Score categories
+    plt.hist(tn_linger, bins=150, alpha=1, color='#b6cde0', label='True Negative (TN)')
+    plt.hist(fp_linger, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
+    plt.hist(fn_linger, bins=150, alpha=1, color='#efc69f', label='False Negative (FN)')
+    plt.hist(tp_linger, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
+
+    # Plot Linger threshold line
+    plt.axvline(x=linger_threshold, color='black', linestyle='--', linewidth=2)
+    plt.title("LINGER Score Distribution")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+    plt.xlabel("log2 LINGER Score")
+    plt.ylabel("Frequency")
+
+    # Adjust layout and save the plot
+    plt.tight_layout()
+    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histogram_with_accuracy_threshold.png')
+
+def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, lower_threshold = None):
+
+    # Set the ground truth and inferred network scores to log2 scale
+    inferred_network["Score"] = np.log2(inferred_network["Score"])
+    ground_truth["Score"] = np.log2(ground_truth["Score"])
+    
+    # Set the default threshold as 1 stdev below the mean ground truth score
+    if lower_threshold == None:
+        mean = ground_truth["Score"].mean()
+        std = ground_truth["Score"].std()
+        
+        lower_threshold = mean - 1 * std
+    
+    true_positive_df: pd.DataFrame = ground_truth[ground_truth["Score"] >= lower_threshold]["Score"]
+    false_negative_df: pd.DataFrame = ground_truth[ground_truth["Score"] < lower_threshold]["Score"]
+    
+    false_positive_df: pd.DataFrame = inferred_network[inferred_network["Score"] >= lower_threshold]["Score"]
+    true_negative_df: pd.DataFrame = inferred_network[inferred_network["Score"] < lower_threshold]["Score"]
+    
+    return true_positive_df, false_positive_df, true_negative_df, false_negative_df
+
+def plot_histogram_with_threshold(
+    dataset_label: str,
+    true_negative_df: pd.DataFrame,
+    false_positive_df: pd.DataFrame,
+    false_negative_df: pd.DataFrame,
+    true_positive_df: pd.DataFrame,
+    lower_threshold: pd.DataFrame = None
+    ) -> plt.Figure:
+    
+    # Create the figure and axes
+    fig, ax = plt.subplots()
+
+    # Plot histograms for Oracle Score categories with calculated bin sizes
+    ax.hist(true_negative_df.squeeze(), bins=75, alpha=1, color='#b6cde0', label='True Negative (TN)')
+    ax.hist(false_positive_df.squeeze(), bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
+    ax.hist(false_negative_df.squeeze(), bins=75, alpha=1, color='#efc69f', label='False Negative (FN)')
+    ax.hist(true_positive_df.squeeze(), bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
+
+    # Plot Oracle threshold line
+    ax.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2)
+    ax.set_title(f"{dataset_label} Score Distribution")
+    ax.set_xlabel(f"log2 {dataset_label} Score")
+    ax.set_ylabel("Frequency")
+    ax.legend()
+
+    return fig

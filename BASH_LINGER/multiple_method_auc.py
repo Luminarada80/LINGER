@@ -547,6 +547,16 @@ if __name__ == '__main__':
     linger_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, linger_network_subset)
     oracle_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, oracle_network_subset)
     
+    # Create a deepcopy of the ground truth for each inference method
+    oracle_ground_truth = deepcopy(ground_truth_with_scores)
+    linger_ground_truth = deepcopy(ground_truth_with_scores)
+    
+    # rename the inference method score column to "Score" to match the inferred dataset (for concatenating)
+    oracle_ground_truth = oracle_ground_truth.rename(columns={'Oracle_Score': 'Score'})
+    linger_ground_truth = linger_ground_truth.rename(columns={'Linger_Score': 'Score'})
+    
+    separated_vals = helper_functions.find_inferred_network_accuracy_metrics(linger_ground_truth, linger_no_ground_truth)
+    
     # Calculate the accuracy metrics with a sliding threshold based on the top 10,000 - 50,000 edges
     print('Calculating accuracy metrics using threshold of top 10000, 20000, 30000, 40000, and 50000 edges')
     calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir)

@@ -14,9 +14,6 @@ LOG_DIR="/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/B
 # Dynamically set the job name
 scontrol update JobID=$SLURM_JOB_ID JobName=linger_${SAMPLE_NUM}
 
-# Set output and error files dynamically
-exec > "${LOG_DIR}/Linger_Results_${SAMPLE_NUM}.txt" 2> "${LOG_DIR}/Linger_Errors_${SAMPLE_NUM}.err"
-
 GENOME='mm10'
 METHOD='scNN'
 CELLTYPE='all'
@@ -25,18 +22,23 @@ ACTIVEF='ReLU'
 UZUN_LAB_DIR='/gpfs/Labs/Uzun'
 DATA_DIR="${UZUN_LAB_DIR}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA"
 TSS_MOTIF_INFO_PATH="${UZUN_LAB_DIR}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_OTHER_SPECIES_TF_MOTIF_DATA/provide_data/"
-GROUND_TRUTH_DIR="${DATA_DIR}/filtered_ground_truth_56TFs_3036TGs.csv"
 
 OUTPUT_DIR="${UZUN_LAB_DIR}/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL"
 RESULTS_DIR="${UZUN_LAB_DIR}/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/mESC_RESULTS"
 
-RNA_DATA_PATH="${DATA_DIR}/subsampled_RNA_${SAMPLE_NUM}.csv"
-ATAC_DATA_PATH="${DATA_DIR}/subsampled_ATAC_${SAMPLE_NUM}.csv"
-SAMPLE_DATA_DIR="${OUTPUT_DIR}/sample_${SAMPLE_NUM}"
-SAMPLE_OUTPUT_DIR="${OUTPUT_DIR}/sample_${SAMPLE_NUM}/"
-SAMPLE_RESULTS_DIR="${RESULTS_DIR}/sample_${SAMPLE_NUM}"
+# Change these! Paths to the RNA and ATAC data
+RNA_DATA_PATH="${DATA_DIR}/FULL_MESC_SAMPLES/multiomic_data_${SAMPLE_NUM}_RNA.csv"
+ATAC_DATA_PATH="${DATA_DIR}/FULL_MESC_SAMPLES/multiomic_data_${SAMPLE_NUM}_ATAC.csv"
+GROUND_TRUTH_DIR="${DATA_DIR}/RN111.tsv"
 
-mkdir -p "${SAMPLE_DATA_DIR}" "${SAMPLE_OUTPUT_DIR}" "${SAMPLE_RESULTS_DIR}" "${LOG_DIR}/sample_${SAMPLE_NUM}/"
+SAMPLE_DATA_DIR="${OUTPUT_DIR}/${SAMPLE_NUM}"
+SAMPLE_OUTPUT_DIR="${OUTPUT_DIR}/${SAMPLE_NUM}/"
+SAMPLE_RESULTS_DIR="${RESULTS_DIR}/${SAMPLE_NUM}"
+
+mkdir -p "${SAMPLE_DATA_DIR}" "${SAMPLE_OUTPUT_DIR}" "${SAMPLE_RESULTS_DIR}" "${LOG_DIR}/${SAMPLE_NUM}/"
+
+# Set output and error files dynamically
+exec > "${LOG_DIR}/${SAMPLE_NUM}/Linger_Results_${SAMPLE_NUM}.txt" 2> "${LOG_DIR}/${SAMPLE_NUM}/Linger_Errors_${SAMPLE_NUM}.err"
 
 echo "Processing sample number ${SAMPLE_NUM}..."
 
@@ -48,7 +50,7 @@ run_step() {
   echo "Running $step_name..."
   
   # Use /usr/bin/time with verbose output to capture memory and timing
-  /usr/bin/time -v python3 "$script_path" "$@" 2>> "${LOG_DIR}/sample_${SAMPLE_NUM}/${step_name}_time_mem_${SAMPLE_NUM}.log"
+  /usr/bin/time -v python3 "$script_path" "$@" 2>> "${LOG_DIR}/${SAMPLE_NUM}/${step_name}_time_mem.log"
 }
 
 # Run each step of the pipeline with resource tracking
