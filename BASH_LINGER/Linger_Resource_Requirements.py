@@ -11,6 +11,12 @@ sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELL
 
 import BASH_LINGER.shared_variables as shared_variables
 
+# The path to the LOGS directory
+LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS'
+
+# List the directories to the resource logging files for each sample
+SAMPLE_LIST = ["sample_1000", "sample_2000", "sample_3000", "sample_4000", "sample_5000"]
+
 def parse_wall_clock_time(line):
     # Extract the time part after the last mention of 'time'
     time_part = line.split("):")[-1].strip()
@@ -130,176 +136,171 @@ def plot_total_metric_by_sample(sample_resource_dict, metric, ylabel, title, fil
     plt.savefig(filename, dpi=200)
     print(f'Saved {filename.split("/")[-1]}')
 
-# The path to the LOGS directory
-LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS'
+if __name__ == '__main__':
+    # Define a dictionary to hold the sample names with their resource requirements for each step in the pipeline
+    sample_resource_dict = {}
 
-# List the directories to the resource logging files for each sample
-SAMPLE_LIST = ["sample_1000", "sample_2000", "sample_3000", "sample_4000", "sample_5000"]
-
-# Define a dictionary to hold the sample names with their resource requirements for each step in the pipeline
-sample_resource_dict = {}
-
-for sample_log_dir in os.listdir(LOG_DIR):
-    
-    # Find each sample in the LOGS directory
-    if sample_log_dir in SAMPLE_LIST:
-        # Initialize pipeline_step_dict once per sample_log_dir
-        sample_resource_dict[sample_log_dir] = {}
+    for sample_log_dir in os.listdir(LOG_DIR):
         
-        # Find each step log file for the sample
-        for file in os.listdir(f'{LOG_DIR}/{sample_log_dir}'):
-            pipeline_step = file.split(".")[0]
-            sample_resource_dict[sample_log_dir][pipeline_step] = {
-                "user_time": 0,
-                "system_time": 0,
-                "percent_cpu": 0,
-                "wall_clock_time": 0,
-                "max_ram": 0
-            }
+        # Find each sample in the LOGS directory
+        if sample_log_dir in SAMPLE_LIST:
+            # Initialize pipeline_step_dict once per sample_log_dir
+            sample_resource_dict[sample_log_dir] = {}
+            
+            # Find each step log file for the sample
+            for file in os.listdir(f'{LOG_DIR}/{sample_log_dir}'):
+                pipeline_step = file.split(".")[0]
+                sample_resource_dict[sample_log_dir][pipeline_step] = {
+                    "user_time": 0,
+                    "system_time": 0,
+                    "percent_cpu": 0,
+                    "wall_clock_time": 0,
+                    "max_ram": 0
+                }
 
-            # Extract each relevant resource statistic for the sample step and save it in a dictionary
-            with open(f'{LOG_DIR}/{sample_log_dir}/{file}', 'r') as log_file:
-                for line in log_file:
-                    if 'User time' in line:
-                        sample_resource_dict[sample_log_dir][pipeline_step]["user_time"] = float(line.split(":")[-1])
-                    if 'System time' in line:
-                        sample_resource_dict[sample_log_dir][pipeline_step]["system_time"] = float(line.split(":")[-1])
-                    if 'Percent of CPU' in line:
-                        sample_resource_dict[sample_log_dir][pipeline_step]["percent_cpu"] = float(line.split(":")[-1].split("%")[-2])
-                    if 'wall clock' in line:
-                        sample_resource_dict[sample_log_dir][pipeline_step]["wall_clock_time"] = parse_wall_clock_time(line)
-                    if 'Maximum resident set size' in line:
-                        kb_per_gb = 1048576
-                        sample_resource_dict[sample_log_dir][pipeline_step]["max_ram"] = (float(line.split(":")[-1]) / kb_per_gb)
+                # Extract each relevant resource statistic for the sample step and save it in a dictionary
+                with open(f'{LOG_DIR}/{sample_log_dir}/{file}', 'r') as log_file:
+                    for line in log_file:
+                        if 'User time' in line:
+                            sample_resource_dict[sample_log_dir][pipeline_step]["user_time"] = float(line.split(":")[-1])
+                        if 'System time' in line:
+                            sample_resource_dict[sample_log_dir][pipeline_step]["system_time"] = float(line.split(":")[-1])
+                        if 'Percent of CPU' in line:
+                            sample_resource_dict[sample_log_dir][pipeline_step]["percent_cpu"] = float(line.split(":")[-1].split("%")[-2])
+                        if 'wall clock' in line:
+                            sample_resource_dict[sample_log_dir][pipeline_step]["wall_clock_time"] = parse_wall_clock_time(line)
+                        if 'Maximum resident set size' in line:
+                            kb_per_gb = 1048576
+                            sample_resource_dict[sample_log_dir][pipeline_step]["max_ram"] = (float(line.split(":")[-1]) / kb_per_gb)
 
-# Plot the resource requirements by step for each sample
-plot_metric_by_step_adjusted(
-    sample_resource_dict=sample_resource_dict,
-    metric='user_time',
-    ylabel='User Time (s) / Percent CPU Usage',
-    title='User Time / Percent CPU Usage by Step for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Step_User_Time_Summary.png',
-    divide_by_cpu=True
-)
+    # Plot the resource requirements by step for each sample
+    plot_metric_by_step_adjusted(
+        sample_resource_dict=sample_resource_dict,
+        metric='user_time',
+        ylabel='User Time (s) / Percent CPU Usage',
+        title='User Time / Percent CPU Usage by Step for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Step_User_Time_Summary.png',
+        divide_by_cpu=True
+    )
 
-plot_metric_by_step_adjusted(
-    sample_resource_dict=sample_resource_dict,
-    metric='system_time',
-    ylabel='System Time (s) / Percent CPU Usage',
-    title='System Time / Percent CPU Usage by Step for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Step_System_Time.png',
-    divide_by_cpu=True
-)
+    plot_metric_by_step_adjusted(
+        sample_resource_dict=sample_resource_dict,
+        metric='system_time',
+        ylabel='System Time (s) / Percent CPU Usage',
+        title='System Time / Percent CPU Usage by Step for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Step_System_Time.png',
+        divide_by_cpu=True
+    )
 
-plot_metric_by_step_adjusted(
-    sample_resource_dict=sample_resource_dict,
-    metric='wall_clock_time',
-    ylabel='Wall Clock Time (s)',
-    title='Wall Clock Time by Step for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Step_Wall_Clock_Time.png',
-    divide_by_cpu=False
-)
+    plot_metric_by_step_adjusted(
+        sample_resource_dict=sample_resource_dict,
+        metric='wall_clock_time',
+        ylabel='Wall Clock Time (s)',
+        title='Wall Clock Time by Step for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Wall_Clock_Time.png',
+        divide_by_cpu=False
+    )
 
-plot_metric_by_step_adjusted(
-    sample_resource_dict=sample_resource_dict,
-    metric='max_ram',
-    ylabel='Max RAM Usage (GB)',
-    title='Max RAM usage by Step for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Step_Max_Ram.png',
-    divide_by_cpu=False
-)
+    plot_metric_by_step_adjusted(
+        sample_resource_dict=sample_resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage by Step for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Max_Ram.png',
+        divide_by_cpu=False
+    )
 
-plot_metric_by_step_adjusted(
-    sample_resource_dict=sample_resource_dict,
-    metric='percent_cpu',
-    ylabel='Percent CPU',
-    title='Percent of the CPU Used',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Step_Percent_Cpu.png',
-    divide_by_cpu=False
-)
+    plot_metric_by_step_adjusted(
+        sample_resource_dict=sample_resource_dict,
+        metric='percent_cpu',
+        ylabel='Percent CPU',
+        title='Percent of the CPU Used',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Percent_Cpu.png',
+        divide_by_cpu=False
+    )
 
-# Plot the resource requirements for running the entire pipeline
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='user_time',
-    ylabel='Total User Time / Percent CPU Usage',
-    title='Total User Time / Percent CPU Usage for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_User_Time.png',
-    divide_by_cpu=True
-)
+    # Plot the resource requirements for running the entire pipeline
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='user_time',
+        ylabel='Total User Time / Percent CPU Usage',
+        title='Total User Time / Percent CPU Usage for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_User_Time.png',
+        divide_by_cpu=True
+    )
 
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='system_time',
-    ylabel='Total System Time / Percent CPU Usage',
-    title='Total System Time / Percent CPU Usage for Each Sample',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_System_Time.png',
-    divide_by_cpu=True
-)
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='system_time',
+        ylabel='Total System Time / Percent CPU Usage',
+        title='Total System Time / Percent CPU Usage for Each Sample',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_System_Time.png',
+        divide_by_cpu=True
+    )
 
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='wall_clock_time',
-    ylabel='Wall Clock Time (s)',
-    title='Total Wall Clock Time',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_Wall_Clock_Time.png',
-    divide_by_cpu=False
-)
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='wall_clock_time',
+        ylabel='Wall Clock Time (s)',
+        title='Total Wall Clock Time',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Wall_Clock_Time.png',
+        divide_by_cpu=False
+    )
 
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='max_ram',
-    ylabel='Max RAM Usage (GB)',
-    title='Max RAM usage',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
-    divide_by_cpu=False
-)
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
+        divide_by_cpu=False
+    )
 
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='max_ram',
-    ylabel='Max RAM Usage (GB)',
-    title='Max RAM usage',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
-    divide_by_cpu=False
-)
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
+        divide_by_cpu=False
+    )
 
-plot_total_metric_by_sample(
-    sample_resource_dict=sample_resource_dict,
-    metric='percent_cpu',
-    ylabel='Percent CPU',
-    title='Average Percent of the CPU Used',
-    filename=f'{shared_variables.results_dir}/resource_analysis/Total_Percent_Cpu.png',
-    divide_by_cpu=False
-)
+    plot_total_metric_by_sample(
+        sample_resource_dict=sample_resource_dict,
+        metric='percent_cpu',
+        ylabel='Percent CPU',
+        title='Average Percent of the CPU Used',
+        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Percent_Cpu.png',
+        divide_by_cpu=False
+    )
 
-summary_dict = {}
+    summary_dict = {}
 
-for sample, step_dict in sample_resource_dict.items():
-    print(sample)
-    if sample not in summary_dict:
-        summary_dict[sample] = {
-                "user_time": 0,
-                "system_time": 0,
-                "percent_cpu": [],
-                "wall_clock_time": 0,
-                "max_ram": []
-            }
-    for step, resource_dict in step_dict.items():
-        print(f'\t{step}')
-        for resource_name, resource_value in resource_dict.items():
-            print(f'\t\t{resource_name}: {resource_value}')
-            if resource_name == "percent_cpu":
-                summary_dict[sample][resource_name].append(round(resource_value,2))
-            elif resource_name == "max_ram":
-                summary_dict[sample][resource_name].append(round(resource_value,2))
-            else:
-                summary_dict[sample][resource_name] += round(resource_value,2)
-    summary_dict[sample]["max_ram"] = max(summary_dict[sample]["max_ram"])
-    summary_dict[sample]["percent_cpu"] = round(sum(summary_dict[sample]["percent_cpu"]) / len(summary_dict[sample]["percent_cpu"]),2)
-    
-summary_df = pd.DataFrame(summary_dict)
-summary_df = summary_df.reindex(sorted(summary_df.columns), axis=1)
-print(summary_df.head())
+    for sample, step_dict in sample_resource_dict.items():
+        print(sample)
+        if sample not in summary_dict:
+            summary_dict[sample] = {
+                    "user_time": 0,
+                    "system_time": 0,
+                    "percent_cpu": [],
+                    "wall_clock_time": 0,
+                    "max_ram": []
+                }
+        for step, resource_dict in step_dict.items():
+            print(f'\t{step}')
+            for resource_name, resource_value in resource_dict.items():
+                print(f'\t\t{resource_name}: {resource_value}')
+                if resource_name == "percent_cpu":
+                    summary_dict[sample][resource_name].append(round(resource_value,2))
+                elif resource_name == "max_ram":
+                    summary_dict[sample][resource_name].append(round(resource_value,2))
+                else:
+                    summary_dict[sample][resource_name] += round(resource_value,2)
+        summary_dict[sample]["max_ram"] = max(summary_dict[sample]["max_ram"])
+        summary_dict[sample]["percent_cpu"] = round(sum(summary_dict[sample]["percent_cpu"]) / len(summary_dict[sample]["percent_cpu"]),2)
+        
+    summary_df = pd.DataFrame(summary_dict)
+    summary_df = summary_df.reindex(sorted(summary_df.columns), axis=1)
+    print(summary_df.head())
 
-summary_df.to_csv(f'{shared_variables.results_dir}/resource_analysis/Resource_Summary.tsv', sep='\t')
+    summary_df.to_csv(f'{shared_variables.results_dir}/resource_analysis/Resource_Summary.tsv', sep='\t')

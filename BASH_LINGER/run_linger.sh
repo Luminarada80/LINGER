@@ -54,42 +54,42 @@ run_step() {
 }
 
 # Run each step of the pipeline with resource tracking
-run_step "Step_010.Linger_Load_Data" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_010.Linger_Load_Data.py" \
-  --rna_data_path "$RNA_DATA_PATH" \
-  --atac_data_path "$ATAC_DATA_PATH" \
-  --data_dir "$DATA_DIR" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --output_dir "$SAMPLE_OUTPUT_DIR"
+# run_step "Step_010.Linger_Load_Data" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_010.Linger_Load_Data.py" \
+#   --rna_data_path "$RNA_DATA_PATH" \
+#   --atac_data_path "$ATAC_DATA_PATH" \
+#   --data_dir "$DATA_DIR" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --output_dir "$SAMPLE_OUTPUT_DIR"
 
-run_step "Step_020.Linger_Training" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_020.Linger_Training.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --genome "$GENOME" \
-  --method "$METHOD" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --output_dir "$SAMPLE_OUTPUT_DIR" \
-  --activef "$ACTIVEF"
+# run_step "Step_020.Linger_Training" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_020.Linger_Training.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --output_dir "$SAMPLE_OUTPUT_DIR" \
+#   --activef "$ACTIVEF"
 
-run_step "Step_030.Create_Cell_Population_GRN" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_030.Create_Cell_Population_GRN.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --genome "$GENOME" \
-  --method "$METHOD" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --output_dir "$SAMPLE_OUTPUT_DIR" \
-  --activef "$ACTIVEF"
+# run_step "Step_030.Create_Cell_Population_GRN" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_030.Create_Cell_Population_GRN.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --output_dir "$SAMPLE_OUTPUT_DIR" \
+#   --activef "$ACTIVEF"
 
-run_step "Step_040.Homer_Motif_Finding" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_040.Homer_Motif_Finding.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --genome "$GENOME" \
-  --output_dir "$SAMPLE_OUTPUT_DIR"
+# run_step "Step_040.Homer_Motif_Finding" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_040.Homer_Motif_Finding.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --genome "$GENOME" \
+#   --output_dir "$SAMPLE_OUTPUT_DIR"
 
-run_step "Step_050.Create_Cell_Type_GRN" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_050.Create_Cell_Type_GRN.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --genome "$GENOME" \
-  --method "$METHOD" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --output_dir "$SAMPLE_OUTPUT_DIR" \
-  --celltype "$CELLTYPE"
+# run_step "Step_050.Create_Cell_Type_GRN" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_050.Create_Cell_Type_GRN.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --output_dir "$SAMPLE_OUTPUT_DIR" \
+#   --celltype "$CELLTYPE"
 
 run_step "Step_060.Analyze_Results" "/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/Step_060.Analyze_Results.py" \
   --result_dir "$SAMPLE_RESULTS_DIR" \

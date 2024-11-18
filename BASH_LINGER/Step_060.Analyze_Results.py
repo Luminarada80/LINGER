@@ -7,6 +7,7 @@ import logging
 import os
 import argparse
 import sys
+import csv
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, f1_score
 
 # Import the project directory to load the linger module
@@ -141,7 +142,7 @@ def load_data():
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth: pd.DataFrame = pd.read_csv(GROUND_TRUTH_PATH, sep=',', header=0, index_col=0)
+    ground_truth: pd.DataFrame = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/RN111.tsv', sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
     return ground_truth
 
 
@@ -258,7 +259,7 @@ def plot_trans_reg_distribution_with_thresholds(
     gt_std = ground_truth_df['Score'].std()
 
     # Define the lower threshold
-    lower_threshold = gt_mean - 2 * gt_std
+    lower_threshold = gt_mean - 1 * gt_std
 
     # Split data into TP, FP, TN, FN based on threshold
     tp_scores = ground_truth_df[ground_truth_df['Score'] >= lower_threshold]['Score']
@@ -485,7 +486,7 @@ def summarize_ground_truth_and_trans_reg(
     gt_stdev = ground_truth_df['Score'].std()
 
     thresholds = {
-        'lower': round(gt_mean - 2 * gt_stdev, decimal_places)
+        'lower': round(gt_mean - 1 * gt_stdev, decimal_places)
     }
 
     # Ensure result directory exists
@@ -532,7 +533,7 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     gt_std = ground_truth_df['Score'].std()
 
     # Define the lower threshold
-    lower_threshold = gt_mean - 2 * gt_std
+    lower_threshold = gt_mean - 1 * gt_std
 
     # Classify ground truth scores
     ground_truth_df['true_interaction'] = 1
