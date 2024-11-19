@@ -16,7 +16,6 @@ parser.add_argument("--tss_motif_info_path", required=True, help="Path to the LI
 parser.add_argument("--genome", required=True, help="Organism genome code")
 parser.add_argument("--method", required=True, help="Training method")
 parser.add_argument("--sample_data_dir", required=True, help="Directory containing LINGER intermediate files")
-parser.add_argument("--output_dir", required=True, help="Output directory for results")
 parser.add_argument("--celltype", required=True, help="Cell type for calculating cell-type specific GRNs")
 
 args = parser.parse_args()
@@ -26,6 +25,8 @@ print(f'Reading in the RNAseq and ATACseq h5ad adata')
 adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
 adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
+output_dir = args.sample_data_dir + "/"
+
 print(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"')
 LL_net.cell_type_specific_TF_RE_binding(
   args.tss_motif_info_path,
@@ -33,7 +34,7 @@ LL_net.cell_type_specific_TF_RE_binding(
   adata_ATAC,
   args.genome,
   args.celltype,
-  args.output_dir,
+  output_dir,
   args.method
   )
 
@@ -44,7 +45,7 @@ LL_net.cell_type_specific_cis_reg(
   adata_ATAC,
   args.genome,
   args.celltype,
-  args.output_dir,
+  output_dir,
   args.method
   )
 
@@ -53,5 +54,5 @@ LL_net.cell_type_specific_trans_reg(
   args.tss_motif_info_path,
   adata_RNA,
   args.celltype,
-  args.output_dir,
+  output_dir,
   )

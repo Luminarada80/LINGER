@@ -5,17 +5,29 @@ import pandas as pd
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 
 # Import necessary modules from linger
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 import BASH_LINGER.shared_variables as shared_variables
 
+# Set font to Arial and adjust font sizes
+rcParams.update({
+    'font.family': 'sans-serif',
+    'font.size': 14,  # General font size
+    'axes.titlesize': 18,  # Title font size
+    'axes.labelsize': 16,  # Axis label font size
+    'xtick.labelsize': 14,  # X-axis tick label size
+    'ytick.labelsize': 14,  # Y-axis tick label size
+    'legend.fontsize': 14  # Legend font size
+})
+
 # The path to the LOGS directory
 LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS'
 
 # List the directories to the resource logging files for each sample
-SAMPLE_LIST = ["sample_1000", "sample_2000", "sample_3000", "sample_4000", "sample_5000"]
+# SAMPLE_LIST = ["sample_1000", "sample_2000", "sample_3000", "sample_4000", "sample_5000"]
 
 def parse_wall_clock_time(line):
     # Extract the time part after the last mention of 'time'
@@ -65,12 +77,12 @@ def plot_metric_by_step_adjusted(sample_resource_dict, metric, ylabel, title, fi
 
     # Plotting the figure with each step on the x-axis and the specified metric on the y-axis
     x = np.arange(len(steps))  # x locations for the groups
-    bar_width = 0.15  # Width of the bars
+    bar_width = 0.02  # Width of the bars
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot each sample as a bar group, with each sample's bars slightly offset
     for i, sample in enumerate(samples):
-        ax.bar(x + i * bar_width, metric_data[sample], bar_width, label=f'{sample.split("_")[1]} Cells')
+        ax.bar(x + i * bar_width, metric_data[sample], bar_width, label=f'{sample.split("_")[0]} Cells')
 
     # Labeling the plot
     ax.set_xlabel('Step')
@@ -78,10 +90,10 @@ def plot_metric_by_step_adjusted(sample_resource_dict, metric, ylabel, title, fi
     ax.set_title(title)
     ax.set_xticks(x + bar_width * (len(samples) - 1) / 2)
     ax.set_xticklabels(steps, rotation=45)
-    ax.legend()
+    plt.figlegend(loc='center right', bbox_to_anchor=(0.98, 0.5), fontsize=8, ncol=1)
 
     # Show plot
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0.06, 0.85, 0.90])
     plt.savefig(filename, dpi=200)
     print(f'Saved {filename.split("/")[-1]}')
 
@@ -119,7 +131,7 @@ def plot_total_metric_by_sample(sample_resource_dict, metric, ylabel, title, fil
     # Plotting the total metric for each sample
     fig, ax = plt.subplots(figsize=(10, 6))
     x = np.arange(len(samples))  # x locations for the samples
-    bar_width = 0.25  # Width of the bars
+    bar_width = 0.15  # Width of the bars
 
 
     ax.bar(x, total_metric_data, bar_width, color='blue', label=metric)
@@ -129,7 +141,7 @@ def plot_total_metric_by_sample(sample_resource_dict, metric, ylabel, title, fil
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     ax.set_xticks(x)
-    ax.set_xticklabels([sample.split("_")[1] for sample in samples], rotation=45)
+    ax.set_xticklabels([sample.split("_")[0] for sample in samples], rotation=45)
 
     # Show plot
     plt.tight_layout()
@@ -139,39 +151,50 @@ def plot_total_metric_by_sample(sample_resource_dict, metric, ylabel, title, fil
 if __name__ == '__main__':
     # Define a dictionary to hold the sample names with their resource requirements for each step in the pipeline
     sample_resource_dict = {}
+    
+    samples = ["E7.5", "E7.75", "E8.0"]
+    
+    sample_list = [
+        sample_dir for sample_dir in os.listdir(LOG_DIR)
+        if any(rep in sample_dir for rep in samples)
+    ]
 
     for sample_log_dir in os.listdir(LOG_DIR):
+        print(f'Analyzing {sample_log_dir}')
         
         # Find each sample in the LOGS directory
-        if sample_log_dir in SAMPLE_LIST:
+        if sample_log_dir in sample_list:
             # Initialize pipeline_step_dict once per sample_log_dir
             sample_resource_dict[sample_log_dir] = {}
             
             # Find each step log file for the sample
             for file in os.listdir(f'{LOG_DIR}/{sample_log_dir}'):
-                pipeline_step = file.split(".")[0]
-                sample_resource_dict[sample_log_dir][pipeline_step] = {
-                    "user_time": 0,
-                    "system_time": 0,
-                    "percent_cpu": 0,
-                    "wall_clock_time": 0,
-                    "max_ram": 0
-                }
+                
+                if file.endswith(".log"):
+                    print(file)
+                    pipeline_step = file.split(".")[0]
+                    sample_resource_dict[sample_log_dir][pipeline_step] = {
+                        "user_time": 0,
+                        "system_time": 0,
+                        "percent_cpu": 0,
+                        "wall_clock_time": 0,
+                        "max_ram": 0
+                    }
 
-                # Extract each relevant resource statistic for the sample step and save it in a dictionary
-                with open(f'{LOG_DIR}/{sample_log_dir}/{file}', 'r') as log_file:
-                    for line in log_file:
-                        if 'User time' in line:
-                            sample_resource_dict[sample_log_dir][pipeline_step]["user_time"] = float(line.split(":")[-1])
-                        if 'System time' in line:
-                            sample_resource_dict[sample_log_dir][pipeline_step]["system_time"] = float(line.split(":")[-1])
-                        if 'Percent of CPU' in line:
-                            sample_resource_dict[sample_log_dir][pipeline_step]["percent_cpu"] = float(line.split(":")[-1].split("%")[-2])
-                        if 'wall clock' in line:
-                            sample_resource_dict[sample_log_dir][pipeline_step]["wall_clock_time"] = parse_wall_clock_time(line)
-                        if 'Maximum resident set size' in line:
-                            kb_per_gb = 1048576
-                            sample_resource_dict[sample_log_dir][pipeline_step]["max_ram"] = (float(line.split(":")[-1]) / kb_per_gb)
+                    # Extract each relevant resource statistic for the sample step and save it in a dictionary
+                    with open(f'{LOG_DIR}/{sample_log_dir}/{file}', 'r') as log_file:
+                        for line in log_file:
+                            if 'User time' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["user_time"] = float(line.split(":")[-1])
+                            if 'System time' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["system_time"] = float(line.split(":")[-1])
+                            if 'Percent of CPU' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["percent_cpu"] = float(line.split(":")[-1].split("%")[-2])
+                            if 'wall clock' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["wall_clock_time"] = parse_wall_clock_time(line)
+                            if 'Maximum resident set size' in line:
+                                kb_per_gb = 1048576
+                                sample_resource_dict[sample_log_dir][pipeline_step]["max_ram"] = (float(line.split(":")[-1]) / kb_per_gb)
 
     # Plot the resource requirements by step for each sample
     plot_metric_by_step_adjusted(

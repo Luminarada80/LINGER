@@ -13,9 +13,10 @@ parser = argparse.ArgumentParser(description="Train the scNN neural network mode
 parser.add_argument("--tss_motif_info_path", required=True, help="Path to the LINGER TSS information path for the organism")
 parser.add_argument("--sample_data_dir", required=True, help="Directory containing LINGER intermediate files")
 parser.add_argument("--genome", required=True, help="Organism genome code")
-parser.add_argument("--output_dir", required=True, help="Output directory for results")
 
 args = parser.parse_args()
+
+output_dir = args.sample_data_dir + "/"
 
 # Create the region file by merging Peaks.bed and Peaks.txt
 command = f'paste {os.path.join(args.sample_data_dir, "Peaks.bed")} {os.path.join(args.sample_data_dir, "Peaks.txt")} > {os.path.join(args.sample_data_dir, "region.txt")}'
@@ -42,7 +43,7 @@ genome_map.index = genome_map['genome_short']
 
 # Construct the Homer command with the correct genome and motif file path
 motif_file = f'all_motif_rmdup_{genome_map.loc[args.genome]["Motif"]}'
-command = f'findMotifsGenome.pl {os.path.join(args.sample_data_dir, "region.txt")} {args.genome} {args.output_dir} -size given -find {os.path.join(args.tss_motif_info_path, motif_file)} > {os.path.join(args.output_dir, "MotifTarget.bed")}'
+command = f'findMotifsGenome.pl {os.path.join(args.sample_data_dir, "region.txt")} {args.genome} {output_dir} -size given -find {os.path.join(args.tss_motif_info_path, motif_file)} > {os.path.join(output_dir, "MotifTarget.bed")}'
 
 # Run Homer command with error handling
 try:

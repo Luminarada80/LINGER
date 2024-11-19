@@ -23,16 +23,18 @@ parser.add_argument("--activef", required=True, help="activation function to use
 
 args = parser.parse_args()
 
+output_dir = args.sample_data_dir + "/"
+
 logging.info('Getting TSS')
 LINGER_tr.get_TSS(
     args.tss_motif_info_path,
     args.genome, 
     200000, # Here, 200000 represent the largest distance of regulatory element to the TG. Other distance is supported
-    args.output_dir # I altered the function to allow for a different output directory
+    output_dir # I altered the function to allow for a different output directory
     ) 
 
 logging.info('Getting RE-TG distances')
-LINGER_tr.RE_TG_dis(args.output_dir, args.sample_data_dir)
+LINGER_tr.RE_TG_dis(output_dir, args.sample_data_dir)
 
 genomemap=pd.read_csv(args.tss_motif_info_path+'genome_map_homer.txt',sep='\t')
 genomemap.index=genomemap['genome_short']
@@ -43,7 +45,7 @@ logging.info(f'\nBeginning LINGER single cell training...')
 LINGER_tr.training(
     args.tss_motif_info_path,
     args.method,
-    args.output_dir,
+    output_dir,
     args.sample_data_dir, # Altered the function to allow for the data dir to be separate from output_dir
     args.activef,
     species

@@ -9,12 +9,20 @@ import argparse
 import sys
 import csv
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve, f1_score
+from matplotlib import rcParams
 
-# Import the project directory to load the linger module
-sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/')
+# Set font to Arial and adjust font sizes
+rcParams.update({
+    'font.family': 'sans-serif',
+    'font.size': 14,  # General font size
+    'axes.titlesize': 18,  # Title font size
+    'axes.labelsize': 16,  # Axis label font size
+    'xtick.labelsize': 14,  # X-axis tick label size
+    'ytick.labelsize': 14,  # Y-axis tick label size
+    'legend.fontsize': 14  # Legend font size
+})
 
 from linger import Benchmk
-import BASH_LINGER.shared_variables as shared_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -38,10 +46,10 @@ def parse_args():
         help="Directory to store analysis results in"
     )
     parser.add_argument(
-        "--output_dir",
+        "--sample_data_dir",
         type=str,
         required=True,
-        help="Directory to LINGER output results in"
+        help="Directory to LINGER results"
     )
     parser.add_argument(
         "--ground_truth_path",
@@ -86,8 +94,9 @@ CELL_POP = args.cell_pop  # Default False
 CELL_TYPE = args.cell_type
 SAMPLE_NUM = args.sample_num
 RESULT_DIR = args.result_dir
-OUTPUT_DIR = args.output_dir
 GROUND_TRUTH_PATH = args.ground_truth_path
+
+OUTPUT_DIR = args.sample_data_dir + "/"
 
 # Define the summary file path
 SUMMARY_FILE_PATH = f"{RESULT_DIR}/{CELL_TYPE if not CELL_POP else 'cell_pop'}/summary_statistics.txt"
@@ -102,14 +111,14 @@ if CELL_POP == False:
     print(f'CELL_TYPE is set to "{CELL_TYPE}"')
 
 if CELL_POP == True:
-    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}cell_population_TF_RE_binding.txt'
-    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_population_cis_regulatory.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_population_trans_regulatory.txt'
+    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}/cell_population_TF_RE_binding.txt'
+    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}/cell_population_cis_regulatory.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}/cell_population_trans_regulatory.txt'
 
 elif CELL_POP == False:
-    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
-    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
-    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
+    TF_RE_BINDING_PATH: str = f'{OUTPUT_DIR}/cell_type_specific_TF_RE_binding_{CELL_TYPE}.txt'
+    CIS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}/cell_type_specific_cis_regulatory_{CELL_TYPE}.txt'
+    TRANS_REG_NETWORK_PATH: str = f'{OUTPUT_DIR}/cell_type_specific_trans_regulatory_{CELL_TYPE}.txt'
 
     # Make sure that the cell type specific dataset is present
     os.makedirs(f'{RESULT_DIR}/{CELL_TYPE}', exist_ok=True)
@@ -562,11 +571,11 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     }
 
     # Create a directory in the results_dir to store the individual accuracy, PR curve, and ROC curve files
-    if not os.path.exists(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/'):
-        os.makedirs(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/')
+    if not os.path.exists(f'{RESULT_DIR}/accuracy_metrics/individual_sample_metrics/'):
+        os.makedirs(f'{RESULT_DIR}/accuracy_metrics/individual_sample_metrics/')
 
     roc_curve_df = pd.DataFrame(roc_curve_dict)
-    roc_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_roc_curve_df.csv', index=False)
+    roc_curve_df.to_csv(f'{RESULT_DIR}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_roc_curve_df.csv', index=False)
 
     roc_auc = auc(fpr, tpr)
 
@@ -633,7 +642,7 @@ def accuracy_metrics_and_plots(ground_truth_df: pd.DataFrame, trans_reg_minus_gr
     summary_df = pd.DataFrame(summary_dict)
 
     # Save the more easily-parsable format
-    summary_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_accuracy_metrics_summary.csv', index=False)
+    summary_df.to_csv(f'{RESULT_DIR}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_accuracy_metrics_summary.csv', index=False)
 
     # Plotting the ROC Curve
     plt.figure(figsize=(8, 6))
@@ -686,7 +695,7 @@ def plot_precision_recall_curve(
     }
 
     pr_curve_df = pd.DataFrame(pr_curve_dict)
-    pr_curve_df.to_csv(f'{shared_variables.results_dir}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_pr_curve_df.csv', index=False)
+    pr_curve_df.to_csv(f'{RESULT_DIR}/accuracy_metrics/individual_sample_metrics/{SAMPLE_NUM}_pr_curve_df.csv', index=False)
 
     return pr_auc
 

@@ -12,10 +12,11 @@ parser.add_argument("--tss_motif_info_path", required=True, help="Path to the LI
 parser.add_argument("--genome", required=True, help="Organism genome code")
 parser.add_argument("--method", required=True, help="Training method")
 parser.add_argument("--sample_data_dir", required=True, help="Directory containing LINGER intermediate files")
-parser.add_argument("--output_dir", required=True, help="Output directory for results")
 parser.add_argument("--activef", required=True, help="activation function to use for training")
 
 args = parser.parse_args()
+
+output_dir = args.sample_data_dir + "/"
 
 # Load in the adata_RNA and adata_ATAC files
 print(f'Reading in the RNAseq and ATACseq h5ad adata')
@@ -31,7 +32,7 @@ LL_net.TF_RE_binding(
   adata_ATAC,
   args.genome,
   args.method,
-  args.output_dir
+  output_dir
   )
 
 # Calculate the cis-regulatory scores
@@ -43,7 +44,7 @@ LL_net.cis_reg(
   adata_ATAC,
   args.genome,
   args.method,
-  args.output_dir
+  output_dir
   )
 
 # Calculate the trans-regulatory scores
@@ -52,6 +53,6 @@ LL_net.trans_reg(
   args.tss_motif_info_path,
   args.sample_data_dir,
   args.method,
-  args.output_dir,
+  output_dir,
   args.genome
   )

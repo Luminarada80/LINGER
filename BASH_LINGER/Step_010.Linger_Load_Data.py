@@ -23,10 +23,11 @@ parser.add_argument("--rna_data_path", required=True, help="Path to RNA data CSV
 parser.add_argument("--atac_data_path", required=True, help="Path to ATAC data CSV file")
 parser.add_argument("--data_dir", required=True, help="Directory to save processed data")
 parser.add_argument("--sample_data_dir", required=True, help="Output directory for LINGER-generated data files")
-parser.add_argument("--output_dir", required=True, help="Output directory for results")
 
 # Parse arguments
 args = parser.parse_args()
+
+output_dir = args.sample_data_dir + "/"
 
 # ----- THIS PART DIFFERS BETWEEN DATASETS -----
 print('\tReading in cell labels...')
