@@ -578,53 +578,6 @@ if __name__ == '__main__':
         print(f"\tTrue Negatives: {accuracy_metrics['true_negative']:,}")
         print(f"\tFalse Positives: {accuracy_metrics['false_positive']:,}")
         print(f"\tFalse Negatives: {accuracy_metrics['false_negative']:,}")
-        
-        # Subset to get the inferred network scores for the TP, FP, FN, and TN from the ground truth network
-        # True positive if the interaction is true and the predicted interaction is true for ground truth
-        tp = method_ground_truth[
-            (method_ground_truth['true_interaction'] == 1) &
-            (method_ground_truth['predicted_interaction'] == 1)
-            ]['Score'].dropna()
-        
-        # False positive if the interaction is false but the predicted interaction is true for the inferred network
-        fp = inferred_network_no_ground_truth_df[
-            (inferred_network_no_ground_truth_df['true_interaction'] == 0) & 
-            (inferred_network_no_ground_truth_df['predicted_interaction'] == 1)
-            ]['Score'].dropna()
-        
-        # False negative if the interaction is true, but the predicted interaction is false in the inferred network
-        fn = method_ground_truth[
-            (method_ground_truth['true_interaction'] == 1) & 
-            (method_ground_truth['predicted_interaction'] == 0)
-            ]['Score'].dropna()
-        
-        # True negative if the interaction is false and the predicted interaction is false
-        tn = inferred_network_no_ground_truth_df[
-            (inferred_network_no_ground_truth_df['true_interaction'] == 0) & 
-            (inferred_network_no_ground_truth_df['predicted_interaction'] == 0)
-            ]['Score'].dropna()
-        
-        method_score_distribution_dict[method] = {
-            'tp': tp,
-            'fp': fp,
-            'fn': fn,
-            'tn': tn
-        }
-        
-        # Make sure that the dataframes for the method are updated in the dictionaries
-        ground_truth_dict[method] = method_ground_truth
-        inferred_network_dict[method] = inferred_network_no_ground_truth_df
-        
-        
-    print(f'\n----- Inferred Network Score Distributions by Method -----')
-    for method, score_dict in method_score_distribution_dict.items():
-        print(f"\tAverage accuracy scores for {method}")
-        print(f"\t\tTP: {np.mean(score_dict['tp']):.2f}")
-        print(f"\t\tFP: {np.mean(score_dict['fp']):.2f}")
-        print(f"\t\tFN: {np.mean(score_dict['fn']):.2f}")
-        print(f"\t\tTN: {np.mean(score_dict['tn']):.2f}")
-        
-    
     
     helper_functions.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_network_dict, result_dir)
     
