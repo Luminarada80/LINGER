@@ -324,7 +324,8 @@ def sc_nn_cpu(ii: int, gene_chr: pd.DataFrame, TFindex: list[str], TFindex_bulk:
             loss.backward()
             optimizer.step()
         np.random.seed(42)
-        background = X_tr[np.random.choice(X_tr.shape[0], 50, replace=False)]
+        sample_size = min(50, X_tr.shape[0])  # Use the smaller of 50 or the number of rows in X_tr
+        background = X_tr[np.random.choice(X_tr.shape[0], sample_size, replace=False)]
         explainer = shap.DeepExplainer(net,background)
         shap_values = explainer.shap_values(X_tr)
         return net,shap_values,0.5,0.5,1,Loss0

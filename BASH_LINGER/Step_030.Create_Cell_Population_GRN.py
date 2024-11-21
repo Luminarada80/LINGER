@@ -4,8 +4,6 @@ import sys
 import argparse
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
-import linger_1_92.LL_net as LL_net
-
 parser = argparse.ArgumentParser(description="Generate cell population GRN.")
 
 parser.add_argument("--tss_motif_info_path", required=True, help="Path to the LINGER TSS information path for the organism")
@@ -13,10 +11,16 @@ parser.add_argument("--genome", required=True, help="Organism genome code")
 parser.add_argument("--method", required=True, help="Training method")
 parser.add_argument("--sample_data_dir", required=True, help="Directory containing LINGER intermediate files")
 parser.add_argument("--activef", required=True, help="activation function to use for training")
+parser.add_argument("--organism", required=True, help='Enter "mouse" or "human"')
 
 args = parser.parse_args()
 
 output_dir = args.sample_data_dir + "/"
+
+if args.organism.lower() == "mouse":
+  import linger_1_92.LL_net as LL_net
+elif args.organism.lower() == "human":
+  import linger.LL_net as LL_net
 
 # Load in the adata_RNA and adata_ATAC files
 print(f'Reading in the RNAseq and ATACseq h5ad adata')

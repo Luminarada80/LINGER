@@ -23,6 +23,11 @@ parser.add_argument("--rna_data_path", required=True, help="Path to RNA data CSV
 parser.add_argument("--atac_data_path", required=True, help="Path to ATAC data CSV file")
 parser.add_argument("--data_dir", required=True, help="Directory to save processed data")
 parser.add_argument("--sample_data_dir", required=True, help="Output directory for LINGER-generated data files")
+parser.add_argument("--organism", required=True, help='Enter "mouse" or "human"')
+parser.add_argument("--bulk_model_dir", required=True, help='Path to the LINGER trained bulk model for humans')
+parser.add_argument("--genome", required=True, help="Organism genome code")
+parser.add_argument("--method", required=True, help="Training method")
+
 
 # Parse arguments
 args = parser.parse_args()
@@ -34,6 +39,14 @@ print('\tReading in cell labels...')
 # Load scRNA-seq data
 rna_data = pd.read_csv(args.rna_data_path, sep=',', index_col=0)
 atac_data = pd.read_csv(args.atac_data_path, sep=',', index_col=0)
+
+# Update the index to replace '-' with ':' for the chromosome coordinates chr-start-stop -> chr:start-stop
+if not atac_data.index.str.contains(':').all():
+    print(atac_data.index[0])
+    atac_data.index = atac_data.index.str.replace('-', ':', n=1)
+    print(atac_data.index[0])
+
+    atac_data.to_csv(args.atac_data_path, sep=',')
 
 # Create the data matrix by concatenating the RNA and ATAC data by their indices
 matrix = csc_matrix(pd.concat([rna_data, atac_data], axis=0).values)
@@ -130,3 +143,19 @@ pd.DataFrame(adata_ATAC.var['gene_ids']).to_csv(f'{args.sample_data_dir}/Peaks.t
 print(f'Writing out pseudobulk...')
 TG_pseudobulk.to_csv(f'{args.sample_data_dir}/TG_pseudobulk.tsv', sep='\t', index=True)
 RE_pseudobulk.to_csv(f'{args.sample_data_dir}/RE_pseudobulk.tsv', sep='\t', index=True)
+
+if args.organism.lower() == 'human':
+
+    # Overlap the region with the general GRN
+    print('Overlapping the regions with the general model')
+    preprocess(
+        TG_pseudobulk,
+        RE_pseudobulk,
+        peak_file=f'{args.sample_data_dir}/Peaks.txt',
+        grn_dir=args.bulk_model_dir,
+        genome=args.genome,
+        method=args.method,
+        output_dir=args.sample_data_dir
+        )
+
+    print('Finished Preprocessing')
