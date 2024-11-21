@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import math
 from typing import TextIO
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -32,7 +33,15 @@ def log_and_write(file: TextIO, message: str) -> None:
     logging.info(message)
     file.write(message + '\n')
 
-def source_target_cols_uppercase(df: pd.DataFrame):
+def source_target_cols_uppercase(df: pd.DataFrame) -> pd.DataFrame:
+    """Converts the Source and Target columns to uppercase for a dataframe
+    
+    Args:
+        df (pd.DataFrame): GRN dataframe with "Source" and "Target" gene name columns
+
+    Returns:
+        pd.DataFrame: The same dataframe with uppercase gene names
+    """
     df["Source"] = df["Source"].str.upper()
     df["Target"] = df["Target"].str.upper()
 
@@ -79,7 +88,7 @@ def create_standard_dataframe(
         # If no melting is required, we just rename columns directly
         melted_df = inferred_network_df.rename(columns={source_col: "Source", target_col: "Target", score_col: "Score"})
         
-        logging.info(f'\t{len(set(melted_df["Source"]))} TFs, {len(set(melted_df["Target"]))} TGs, and {len(melted_df["Score"])} edges')
+        logging.info(f'\t{len(set(melted_df["Source"])):,} TFs, {len(set(melted_df["Target"])):,} TGs, and {len(melted_df["Score"]):,} edges')
 
     
     # The dataframe needs to be melted, there are more than 3 columns and no "Source" or "Target" columns
@@ -125,14 +134,15 @@ def create_standard_dataframe(
     
     return standardized_df
 
-def find_ground_truth_scores_from_inferred(
+def add_inferred_scores_to_ground_truth(
     ground_truth_df: pd.DataFrame,
     inferred_network_df: pd.DataFrame,
     score_column_name: str = "Score"
     ) -> pd.DataFrame:
     
     """
-    Merges the inferred network scores with the ground truth dataframe
+    Merges the inferred network scores with the ground truth dataframe, returns a ground truth network
+    with a column containing the inferred Source -> Target score for each row.
     
     Parameters:
         ground_truth_df (pd.DataFrame):
@@ -160,38 +170,6 @@ def find_ground_truth_scores_from_inferred(
 
     
     return ground_truth_with_scores
-
-def remove_tf_tg_not_in_ground_truth(
-    ground_truth_df: pd.DataFrame,
-    inferred_network_df: pd.DataFrame
-    ) -> pd.DataFrame:
-    
-    """
-    Only keeps inferred network TFs and TGs that are also in the ground truth network.
-    
-    Parameters:
-        ground_truth_df (pd.DataFrame):
-            Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
-        
-        inferred_network_df (pd.DataFrame):
-            The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
-    
-    """
-    # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
-    source_target_cols_uppercase(ground_truth_df)
-    source_target_cols_uppercase(inferred_network_df)
-    
-    # Extract unique TFs and TGs from the ground truth network
-    ground_truth_tfs = set(ground_truth_df['Source'])
-    ground_truth_tgs = set(ground_truth_df['Target'])
-    
-    # Subset cell_oracle_network to contain only rows with TFs and TGs in the ground_truth
-    aligned_inferred_network = inferred_network_df[
-        (inferred_network_df['Source'].isin(ground_truth_tfs)) &
-        (inferred_network_df['Target'].isin(ground_truth_tgs))
-    ]
-    
-    return aligned_inferred_network
 
 def remove_ground_truth_edges_from_inferred(
     ground_truth_df: pd.DataFrame,
@@ -228,12 +206,75 @@ def remove_ground_truth_edges_from_inferred(
     
     return inferred_network_no_ground_truth
 
+def remove_tf_tg_not_in_ground_truth(
+    ground_truth_df: pd.DataFrame,
+    inferred_network_df: pd.DataFrame
+    ) -> pd.DataFrame:
+    
+    """
+    Only keeps inferred network TFs and TGs that are also in the ground truth network.
+    
+    Parameters:
+        ground_truth_df (pd.DataFrame):
+            Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
+        
+        inferred_network_df (pd.DataFrame):
+            The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
+    
+    """
+    # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
+    source_target_cols_uppercase(ground_truth_df)
+    source_target_cols_uppercase(inferred_network_df)
+    
+    # Extract unique TFs and TGs from the ground truth network
+    ground_truth_tfs = set(ground_truth_df['Source'])
+    ground_truth_tgs = set(ground_truth_df['Target'])
+    
+    # Subset cell_oracle_network to contain only rows with TFs and TGs in the ground_truth
+    aligned_inferred_network = inferred_network_df[
+        (inferred_network_df['Source'].isin(ground_truth_tfs)) &
+        (inferred_network_df['Target'].isin(ground_truth_tgs))
+    ]
+    
+    return aligned_inferred_network
 
 def calculate_accuracy_metrics(
     ground_truth_df: pd.DataFrame,
-    inferred_network: pd.DataFrame,
-    lower_threshold, num_edges: int,
+    inferred_network_df: pd.DataFrame,
+    lower_threshold: int = None,
+    num_edges_for_early_precision: int = 1000,
     ):
+    
+    """
+    Calculates accuracy metrics for an inferred network.
+    
+    Uses a lower threshold as the cutoff between true and false values. The 
+    default lower threshold is set as 1 standard deviation below the mean 
+    ground truth scores.
+    
+    True Positive: ground truth scores above the lower threshold
+    False Positive: non-ground truth scores above the lower threshold
+    True Negative: non-ground truth scores below the lower threshold
+    False Negative: ground truth scores below the lower threshold
+    
+    Parameters:
+        ground_truth_df (pd.DataFrame):
+            The ground truth dataframe with inferred network scores
+            
+        inferred_network_df (pd.DataFrame):
+            The inferred GRN dataframe
+
+    Returns:
+        summary_dict (dict):
+            A dictionary of the TP, TN, FP, and FN scores along with y_true and y_pred
+            
+        accuracy_metrics (dict):
+            A dictionary of the accuracy metrics and their values
+
+    """
+    
+    if not lower_threshold:
+        lower_threshold = np.mean(ground_truth_df['Score']) - np.std(ground_truth_df['Score']) 
     
     # Classify ground truth scores
     ground_truth_df['true_interaction'] = 1
@@ -241,12 +282,12 @@ def calculate_accuracy_metrics(
         ground_truth_df['Score'] >= lower_threshold, 1, 0)
 
     # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
-    inferred_network['true_interaction'] = 0
-    inferred_network['predicted_interaction'] = np.where(
-        inferred_network['Score'] >= lower_threshold, 1, 0)
+    inferred_network_df['true_interaction'] = 0
+    inferred_network_df['predicted_interaction'] = np.where(
+        inferred_network_df['Score'] >= lower_threshold, 1, 0)
 
     # Concatenate dataframes for AUC and further analysis
-    auc_df = pd.concat([ground_truth_df, inferred_network])
+    auc_df = pd.concat([ground_truth_df, inferred_network_df])
 
     # Calculate the confusion matrix
     y_true = auc_df['true_interaction']
@@ -263,12 +304,12 @@ def calculate_accuracy_metrics(
 
     # Weighted Jaccard Index
     weighted_tp = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 1, 'Score'].sum()
-    weighted_fp = inferred_network.loc[inferred_network['predicted_interaction'] == 1, 'Score'].sum()
+    weighted_fp = inferred_network_df.loc[inferred_network_df['predicted_interaction'] == 1, 'Score'].sum()
     weighted_fn = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 0, 'Score'].sum()
     weighted_jaccard_index = weighted_tp / (weighted_tp + weighted_fp + weighted_fn)
     
     # Early Precision Rate for top 1000 predictions
-    top_edges = auc_df.nlargest(int(num_edges), 'Score')
+    top_edges = auc_df.nlargest(int(num_edges_for_early_precision), 'Score')
     early_tp = top_edges[top_edges['true_interaction'] == 1].shape[0]
     early_fp = top_edges[top_edges['true_interaction'] == 0].shape[0]
     early_precision_rate = early_tp / (early_tp + early_fp)
@@ -295,73 +336,76 @@ def calculate_accuracy_metrics(
     
     return summary_dict, accuracy_metrics
 
-def plot_multiple_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
+def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_network_dict: dict, result_dir: str) -> None:
+    """
+    Generates histograms of the TP, FP, TN, FN score distributions for each method. Uses a lower threshold of 1 stdev below
+    the mean ground truth score. 
+
+    Args:
+        ground_truth_dict (dict): _description_
+        inferred_network_dict (dict): _description_
+        result_dir (str): _description_
+    """
     
-    def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, score_col: str):
-    
-        # Set the ground truth and inferred network scores to log2 scale
-        inferred_network["Score"] = np.log2(inferred_network["Score"])
-        ground_truth[score_col] = np.log2(ground_truth[score_col])
-        
-        # Set the threshold for the accuracy metrics based on the ground truth mean
-        mean = ground_truth[score_col].mean()
-        std = ground_truth[score_col].std()
-        
-        threshold = mean - 1 * std
-        
-        tp = ground_truth[ground_truth[score_col] >= threshold][score_col]
-        fn = ground_truth[ground_truth[score_col] < threshold][score_col]
-        
-        fp = inferred_network[inferred_network["Score"] >= threshold]["Score"]
-        tn = inferred_network[inferred_network["Score"] < threshold]["Score"]
-        
-        return tp, fp, tn, fn, threshold
-    
-    tp_oracle, fp_oracle, tn_oracle, fn_oracle, oracle_threshold = find_inferred_network_accuracy_metrics(
-        ground_truth_with_scores, cell_oracle_subset, "Oracle_Score"
-        )
-    
-    tp_linger, fp_linger, tn_linger, fn_linger, linger_threshold = find_inferred_network_accuracy_metrics(
-        ground_truth_with_scores, linger_network_subset, "Linger_Score"
-        )
+    num_methods = len(ground_truth_dict.keys())
+
+    # Maximum columns per row
+    max_cols = 4
+
+    # Calculate the number of rows and columns
+    num_cols = min(num_methods, max_cols)  # Up to 4 columns
+    num_rows = math.ceil(num_methods / max_cols)  # Rows needed to fit all methods
+
+    print(f"Number of rows: {num_rows}, Number of columns: {num_cols}")
     
     plt.figure(figsize=(18, 8))
-    
-    # Plot the Oracle_Score histogram
-    plt.subplot(1, 2, 1)
 
-    # Plot histograms for Oracle Score categories with calculated bin sizes
-    plt.hist(tn_oracle, bins=75, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    plt.hist(fp_oracle, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
-    plt.hist(fn_oracle, bins=75, alpha=1, color='#efc69f', label='False Negative (FN)')
-    plt.hist(tp_oracle, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
+    # Plot for each method
+    for i, method_name in enumerate(ground_truth_dict.keys()):  
+        print(method_name)
+        
+        # Extract data for the current method
+        ground_truth_scores = ground_truth_dict[method_name]['Score'].dropna()
+        inferred_scores = inferred_network_dict[method_name]['Score'].dropna()
+        
+        plt.subplot(num_rows, num_cols, i+1)
+        
+        # Define the threshold
+        lower_threshold = np.mean(ground_truth_scores) - np.std(ground_truth_scores)
 
-    
-    # Plot Oracle threshold line
-    plt.axvline(x=oracle_threshold, color='black', linestyle='--', linewidth=2)
-    plt.title("CellOracle Score Distribution")
-    plt.xlabel("log2 CellOracle Score")
-    plt.ylabel("Frequency")
+        # Define consistent bin edges for the entire dataset
+        num_bins = 150
+        bin_edges = np.histogram_bin_edges(
+            np.concatenate([ground_truth_scores, inferred_scores]), bins=num_bins
+        )
 
-    # Plot the Linger_Score histogram
-    plt.subplot(1, 2, 2)
+        # Split data into below and above threshold
+        tp = ground_truth_scores[ground_truth_scores > lower_threshold]
+        fn = ground_truth_scores[ground_truth_scores <= lower_threshold]
+        
+        fp = inferred_scores[inferred_scores >= lower_threshold]
+        tn = inferred_scores[inferred_scores < lower_threshold]
+        
+        # Debugging: Print counts for each category
+        print(f"TP count: {len(tp)}, TN count: {len(tn)}, FP count: {len(fp)}, FN count: {len(fn)}")
+        
+        # Plot histograms for Oracle Score categories with consistent bin sizes
+        plt.hist(tn, bins=bin_edges, alpha=1, color='#b6cde0', label='True Negative (TN)')
+        plt.hist(fp, bins=bin_edges, alpha=1, color='#4195df', label='False Positive (FP)')
+        plt.hist(tp, bins=bin_edges, alpha=1, color='#dc8634', label='True Positive (TP)')
+        plt.hist(fn, bins=bin_edges, alpha=1, color='#efc69f', label='False Negative (FN)')
 
-    # Plot histograms for Linger Score categories
-    plt.hist(tn_linger, bins=150, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    plt.hist(fp_linger, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
-    plt.hist(fn_linger, bins=150, alpha=1, color='#efc69f', label='False Negative (FN)')
-    plt.hist(tp_linger, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
-
-    # Plot Linger threshold line
-    plt.axvline(x=linger_threshold, color='black', linestyle='--', linewidth=2)
-    plt.title("LINGER Score Distribution")
+        # Plot Oracle threshold line
+        plt.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2)
+        plt.title(f"{method_name} Score Distribution")
+        plt.xlabel(f"log2 {method_name} Score")
+        plt.ylabel("Frequency")
+        
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.xlabel("log2 LINGER Score")
-    plt.ylabel("Frequency")
 
     # Adjust layout and save the plot
     plt.tight_layout()
-    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histogram_with_accuracy_threshold.png')
+    plt.savefig(f'{result_dir}/Histogram_Multiple_Method_GRN_Scores.png')
 
 def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, lower_threshold = None):
 

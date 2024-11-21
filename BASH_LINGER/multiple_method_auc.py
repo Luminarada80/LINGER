@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 import numpy as np
+import math
 from copy import deepcopy
 import os
 from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score, average_precision_score, precision_recall_curve
@@ -525,51 +526,106 @@ if __name__ == '__main__':
     
     # Standardize the format of the two inferred networks and capitalize gene names
     print('Standardizing the format of the network dataframes')
-    logging.info(f'Ground truth: \n\t{len(set(ground_truth["Source"]))} TFs, {len(set(ground_truth["Target"]))} TGs, and {len(ground_truth["Source"])} edges')
+    logging.info(f'Ground truth: \n\t{len(set(ground_truth["Source"])):,} TFs, {len(set(ground_truth["Target"])):,} TGs, and {len(ground_truth["Source"]):,} edges')
     logging.info('Linger:')
     linger_df = helper_functions.create_standard_dataframe(linger_network)
     
     logging.info(f'CellOracle:')
     oracle_df = helper_functions.create_standard_dataframe(cell_oracle_network, score_col="coef_mean")
     
-    # Find the inferred network scores for the ground truth edges
-    print('Finding ground truth scores')
-    ground_truth_with_oracle_scores = helper_functions.find_ground_truth_scores_from_inferred(ground_truth, oracle_df, "Oracle_Score")
-    ground_truth_with_scores = helper_functions.find_ground_truth_scores_from_inferred(ground_truth_with_oracle_scores, linger_df, "Linger_Score")
+    inferred_network_dict: dict = {
+        'linger': linger_df,
+        'cell_oracle': oracle_df
+        }
     
-    # Subset the inferred dataset to only keep TFs and TGs that are shared between the inferred network and the ground truth
-    print('Removing any TFs and TGs not found in the ground truth network')
-    linger_network_subset = helper_functions.remove_tf_tg_not_in_ground_truth(ground_truth, linger_df)
-    oracle_network_subset = helper_functions.remove_tf_tg_not_in_ground_truth(ground_truth, oracle_df)
+    ground_truth_dict: dict = {}
     
-    # Remove ground truth edges from the inferred network
-    print('Removing ground truth edges from the inferred network')
-    linger_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, linger_network_subset)
-    oracle_no_ground_truth = helper_functions.remove_ground_truth_edges_from_inferred(ground_truth, oracle_network_subset)
+    method_score_distribution_dict: dict = {}
     
-    # Create a deepcopy of the ground truth for each inference method
-    oracle_ground_truth = deepcopy(ground_truth_with_scores)
-    linger_ground_truth = deepcopy(ground_truth_with_scores)
+    # Process the ground truth and inferred networks
+    print('\n----- Processing inferred networks and ground truths -----')
+    for method, inferred_network_df in inferred_network_dict.items():
+        
+        ground_truth_dict[method] = deepcopy(ground_truth)
+        
+        method_ground_truth = ground_truth_dict[method]
+        
+        print(f'\tAdding inferred scores to the ground truth edges for {method}')
+        method_ground_truth = helper_functions.add_inferred_scores_to_ground_truth(method_ground_truth, inferred_network_df)
+        
+        # Drop any NaN scores in the ground truth after adding scores
+        method_ground_truth = method_ground_truth.dropna(subset=['Score'])
+        
+        # Remove ground truth edges from the inferred network
+        print(f'\tRemoving ground truth edges from the inferred network for {method}')
+        inferred_network_no_ground_truth_df = helper_functions.remove_tf_tg_not_in_ground_truth(method_ground_truth, inferred_network_df)
+        print(f"\t\tGround truth shape: TFs = {len(set(method_ground_truth['Source']))}, TGs = {len(set(method_ground_truth['Target']))}, edges = {len(set(method_ground_truth['Score']))}")
+        print(f"\t\tInferred net shape: TFs = {len(set(inferred_network_no_ground_truth_df['Source']))}, TGs = {len(set(inferred_network_no_ground_truth_df['Target']))}, edges = {len(set(inferred_network_no_ground_truth_df['Score']))}")
+        
+        # Drop any NaN scores in the inferred network after adding scores
+        inferred_network_no_ground_truth_df = inferred_network_no_ground_truth_df.dropna(subset=['Score'])
+
+        print(f'\tSeparating out TP, FP, TN, FN for {method}')
+        separated_vals = helper_functions.find_inferred_network_accuracy_metrics(method_ground_truth, inferred_network_no_ground_truth_df)
+        
+        print(f'\n----- Calculating accuracy metrics for {method} -----')
+        summary_dict, accuracy_metrics = helper_functions.calculate_accuracy_metrics(method_ground_truth, inferred_network_no_ground_truth_df)
+        
+        for metric_name, score in summary_dict.items():
+            print(f'\t{metric_name}: {score:.4f}')
+        
+        print(f"\n\tTrue Positives: {accuracy_metrics['true_positive']:,}")
+        print(f"\tTrue Negatives: {accuracy_metrics['true_negative']:,}")
+        print(f"\tFalse Positives: {accuracy_metrics['false_positive']:,}")
+        print(f"\tFalse Negatives: {accuracy_metrics['false_negative']:,}")
+        
+        # Subset to get the inferred network scores for the TP, FP, FN, and TN from the ground truth network
+        # True positive if the interaction is true and the predicted interaction is true for ground truth
+        tp = method_ground_truth[
+            (method_ground_truth['true_interaction'] == 1) &
+            (method_ground_truth['predicted_interaction'] == 1)
+            ]['Score'].dropna()
+        
+        # False positive if the interaction is false but the predicted interaction is true for the inferred network
+        fp = inferred_network_no_ground_truth_df[
+            (inferred_network_no_ground_truth_df['true_interaction'] == 0) & 
+            (inferred_network_no_ground_truth_df['predicted_interaction'] == 1)
+            ]['Score'].dropna()
+        
+        # False negative if the interaction is true, but the predicted interaction is false in the inferred network
+        fn = method_ground_truth[
+            (method_ground_truth['true_interaction'] == 1) & 
+            (method_ground_truth['predicted_interaction'] == 0)
+            ]['Score'].dropna()
+        
+        # True negative if the interaction is false and the predicted interaction is false
+        tn = inferred_network_no_ground_truth_df[
+            (inferred_network_no_ground_truth_df['true_interaction'] == 0) & 
+            (inferred_network_no_ground_truth_df['predicted_interaction'] == 0)
+            ]['Score'].dropna()
+        
+        method_score_distribution_dict[method] = {
+            'tp': tp,
+            'fp': fp,
+            'fn': fn,
+            'tn': tn
+        }
+        
+        # Make sure that the dataframes for the method are updated in the dictionaries
+        ground_truth_dict[method] = method_ground_truth
+        inferred_network_dict[method] = inferred_network_no_ground_truth_df
+        
+        
+    print(f'\n----- Inferred Network Score Distributions by Method -----')
+    for method, score_dict in method_score_distribution_dict.items():
+        print(f"\tAverage accuracy scores for {method}")
+        print(f"\t\tTP: {np.mean(score_dict['tp']):.2f}")
+        print(f"\t\tFP: {np.mean(score_dict['fp']):.2f}")
+        print(f"\t\tFN: {np.mean(score_dict['fn']):.2f}")
+        print(f"\t\tTN: {np.mean(score_dict['tn']):.2f}")
+        
     
-    # rename the inference method score column to "Score" to match the inferred dataset (for concatenating)
-    oracle_ground_truth = oracle_ground_truth.rename(columns={'Oracle_Score': 'Score'})
-    linger_ground_truth = linger_ground_truth.rename(columns={'Linger_Score': 'Score'})
     
-    separated_vals = helper_functions.find_inferred_network_accuracy_metrics(linger_ground_truth, linger_no_ground_truth)
+    helper_functions.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_network_dict, result_dir)
     
-    # Calculate the accuracy metrics with a sliding threshold based on the top 10,000 - 50,000 edges
-    print('Calculating accuracy metrics using threshold of top 10000, 20000, 30000, 40000, and 50000 edges')
-    calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir)
-    
-    # Calculate the AUROC and AUPRC
-    print('Calculating AUROC and AUPRC')
-    calculate_and_plot_auroc_auprc(ground_truth_with_scores, oracle_no_ground_truth, linger_no_ground_truth, result_dir)
-    
-    # Plot the histogram of expression values
-    print('Creating histogram of inferred network scores')
-    plot_histogram(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir)
-    
-    # Plot the histogram of expression values with the accuracy metric cutoffs
-    print('Creating histogram of inferred network scores with accuracy metric cutoffs')
-    plot_histogram_with_thresholds(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir)
     
