@@ -288,10 +288,12 @@ def calculate_accuracy_metrics(
 
     # Concatenate dataframes for AUC and further analysis
     auc_df = pd.concat([ground_truth_df, inferred_network_df])
+    print(auc_df)
 
     # Calculate the confusion matrix
     y_true = auc_df['true_interaction']
     y_pred = auc_df['predicted_interaction']
+    y_scores = auc_df['Score'].dropna()
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     
     # Calculations for accuracy metrics
@@ -320,7 +322,8 @@ def calculate_accuracy_metrics(
         'false_positive': fp,
         'false_negative': fn,
         'y_true': y_true,
-        'y_pred': y_pred
+        'y_pred': y_pred,
+        'y_scores': y_scores
         }
     
     summary_dict = {
@@ -362,7 +365,6 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
 
     # Plot for each method
     for i, method_name in enumerate(ground_truth_dict.keys()):  
-        print(method_name)
         
         # Extract data for the current method
         ground_truth_scores = ground_truth_dict[method_name]['Score'].dropna()
@@ -434,7 +436,7 @@ def plot_histogram_with_threshold(
     false_positive_df: pd.DataFrame,
     false_negative_df: pd.DataFrame,
     true_positive_df: pd.DataFrame,
-    lower_threshold: pd.DataFrame = None
+    lower_threshold: int | float = None
     ) -> plt.Figure:
     
     # Create the figure and axes

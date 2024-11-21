@@ -25,141 +25,6 @@ rcParams.update({
     'legend.fontsize': 14  # Legend font size
 })
 
-
-def create_standard_dataframe(old_df: pd.DataFrame, source_col=None, target_col=None, score_col=None):
-    """Standardizes the column names and capitalizes the gene names"""
-
-    # Capitalize the column names for consistency
-    old_df.columns = old_df.columns.str.capitalize()
-    
-    
-    # Detect if the DataFrame needs to be melted
-    if "Source" in old_df.columns and "Target" in old_df.columns:
-        # print("\nDataFrame appears to be in long format; no melting is required.")
-        
-        source_col = source_col.capitalize() or old_df.columns[0].capitalize()
-        target_col = target_col.capitalize() or old_df.columns[1].capitalize()
-        score_col = score_col.capitalize() or old_df.columns[2].capitalize()
-        
-        logging.info(f'\tThere are {len(set(old_df[source_col]))} TFs, {len(set(old_df[target_col]))} TGs, and {len(old_df[source_col])} edges')
-        
-        # If no melting is required, we just rename columns directly
-        melted_df = old_df.rename(columns={source_col: "Source", target_col: "Target", score_col: "Score"})
-    
-    # The dataframe needs to be melted, there are more than 3 columns and no "Source" or "Target" columns
-    elif old_df.shape[1] > 3:
-        
-        num_rows, num_cols = old_df.shape
-        
-        logging.debug(f'Original dataframe has {num_rows} rows and {num_cols} columns')
-        
-        logging.debug(f'\nOld df before melting:')
-        logging.debug(old_df.head())
-        
-        # TFs are columns, TGs are rows
-        if num_rows >= num_cols:
-            logging.info(f'\tThere are {num_cols} TFs, {num_rows} TGs, and {num_cols * num_rows} edges')
-            # Transpose the columns and rows to prepare for melting
-            old_df = old_df.T
-            
-            # Reset the index to make the TFs a column named 'Source'
-            old_df = old_df.reset_index()
-            old_df = old_df.rename(columns={'index': 'Source'})  # Rename the index column to 'Source'
-    
-            melted_df = old_df.melt(id_vars="Source", var_name="Target", value_name="Score")
-            
-        # TFs are rows, TGs are columns
-        elif num_cols > num_rows:
-            logging.info(f'\tThere are {num_rows} TFs, {num_cols} TGs, and {num_cols * num_rows} edges')
-            
-            # Reset the index to make the TFs a column named 'Source'
-            old_df = old_df.reset_index()
-            old_df = old_df.rename(columns={'index': 'Source'})  # Rename the index column to 'Source'
-    
-            melted_df = old_df.melt(id_vars="Source", var_name="Target", value_name="Score")
-
-    # Capitalize and strip whitespace for consistency
-    melted_df["Source"] = melted_df["Source"].str.upper().str.strip()
-    melted_df["Target"] = melted_df["Target"].str.upper().str.strip()
-
-    # Select and order columns as per new standard
-    new_df = melted_df[["Source", "Target", "Score"]]
-    
-    logging.debug(f'\nNew df after standardizing:')
-    logging.debug(new_df.head())
-    
-    return new_df
-
-def calculate_accuracy_metrics(ground_truth_df: pd.DataFrame, inferred_network: pd.DataFrame, lower_threshold, num_edges: int, summary_file_path: str):
-    # Classify ground truth scores
-    ground_truth_df['true_interaction'] = 1
-    ground_truth_df['predicted_interaction'] = np.where(
-        ground_truth_df['Score'] >= lower_threshold, 1, 0)
-
-    # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
-    inferred_network['true_interaction'] = 0
-    inferred_network['predicted_interaction'] = np.where(
-        inferred_network['Score'] >= lower_threshold, 1, 0)
-
-    # Concatenate dataframes for AUC and further analysis
-    auc_df = pd.concat([ground_truth_df, inferred_network])
-
-    # Calculate the confusion matrix
-    y_true = auc_df['true_interaction']
-    y_pred = auc_df['predicted_interaction']
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    
-        # Calculations for accuracy metrics
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-    specificity = tn / (tn + fp)
-    accuracy = (tp + tn) / (tp + tn + fp + fn)
-    f1_score = 2 * (precision * recall) / (precision + recall)
-    jaccard_index = tp / (tp + fp + fn)
-
-    # Weighted Jaccard Index
-    weighted_tp = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 1, 'Score'].sum()
-    weighted_fp = inferred_network.loc[inferred_network['predicted_interaction'] == 1, 'Score'].sum()
-    weighted_fn = ground_truth_df.loc[ground_truth_df['predicted_interaction'] == 0, 'Score'].sum()
-    weighted_jaccard_index = weighted_tp / (weighted_tp + weighted_fp + weighted_fn)
-    
-    # Early Precision Rate for top 1000 predictions
-    top_edges = auc_df.nlargest(int(num_edges), 'Score')
-    early_tp = top_edges[top_edges['true_interaction'] == 1].shape[0]
-    early_fp = top_edges[top_edges['true_interaction'] == 0].shape[0]
-    early_precision_rate = early_tp / (early_tp + early_fp)
-    
-    # Write results to summary file
-    with open(summary_file_path, 'w') as file:
-        file.write(f'\n- **TP, TN, FP, FN Counts**\n')
-        file.write(f'\t- True Positives: {tp:,}\n')
-        file.write(f'\t- False Positives: {fp:,}\n')
-        file.write(f'\t- True Negatives: {tn:,}\n')
-        file.write(f'\t- False Negatives: {fn:,}\n')
-
-        file.write(f'\n- **Accuracy Metrics**\n')
-        file.write(f"\t- precision: {precision:.4f}\n")
-        file.write(f"\t- recall: {recall:.4f}\n")
-        file.write(f"\t- specificity: {specificity:.4f}\n")
-        file.write(f"\t- accuracy: {accuracy:.4f}\n")
-        file.write(f"\t- f1 score: {f1_score:.4f}\n")
-        file.write(f"\t- Jaccard Index: {jaccard_index:.4f}\n")
-        file.write(f"\t- Weighted Jaccard Index: {weighted_jaccard_index:.4f}\n")
-        file.write(f"\t- Early Precision Rate (top {num_edges}): {early_precision_rate:.4f}")
-    
-    summary_dict = {
-        "precision": precision,
-        "recall": recall,
-        "specificity": specificity,
-        "accuracy": accuracy,
-        "f1_score": f1_score,
-        "jaccard_index": jaccard_index,
-        "weighted_jaccard_index": weighted_jaccard_index,
-        "early_precision_rate": early_precision_rate,
-    }
-    
-    return summary_dict
-
 def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_ground_truth, oracle_no_ground_truth, result_dir):
     # Create a deepcopy of the ground truth for each inference method
     oracle_ground_truth = deepcopy(ground_truth_with_scores)
@@ -186,13 +51,6 @@ def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_g
     num_linger_ground_truth_edges = linger_ground_truth.shape[0]
     
     min_inferred_edges = min(num_linger_edges, num_oracle_edges, num_oracle_ground_truth_edges, num_linger_ground_truth_edges)
-    
-    # print(f'\tnum_linger_edges: {num_linger_edges}')
-    # print(f'\tnum_oracle_edges: {num_oracle_edges}')
-    # print(f'\tnum_oracle_ground_truth_edges: {num_oracle_ground_truth_edges}')
-    # print(f'\tnum_linger_ground_truth_edges: {num_linger_ground_truth_edges}')
-    
-    # print(f'\tMinimum number of inferred edges = {min_inferred_edges}')
         
     interval = 10000
     
@@ -215,19 +73,14 @@ def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_g
         linger_threshold = linger_ground_truth_sorted.iloc[num_edges-1]["Score"]
         cell_oracle_threshold = cell_oracle_ground_truth_sorted.iloc[num_edges-1]["Score"]
         
-        # print(f'\n\tLinger threshold: {linger_threshold}')
-        # print(f'\tCellOracle threshold: {cell_oracle_threshold}')
-        
-        # print(f'\tcalculating accuracy metrics for top {num_edges} edges')
-        
-        linger_summary_dict = calculate_accuracy_metrics(linger_ground_truth, linger_no_ground_truth, linger_threshold, num_edges, f'{top_edge_accuracy_outdir}/top_{num_edges}_linger.txt')
+        linger_summary_dict, linger_accuracy_metrics = helper_functions.calculate_accuracy_metrics(linger_ground_truth, linger_no_ground_truth, linger_threshold, num_edges)
         
         if num_edges not in result_dict['linger']:
             result_dict['linger'][num_edges] = {}
         result_dict['linger'][num_edges] = linger_summary_dict
         
-        cell_oracle_summary_dict = calculate_accuracy_metrics(oracle_ground_truth, oracle_no_ground_truth, cell_oracle_threshold, num_edges, f'{top_edge_accuracy_outdir}/top_{num_edges}_cell_oracle.txt')
-        
+        cell_oracle_summary_dict, cell_oracle_accuracy_metrics = helper_functions.calculate_accuracy_metrics(oracle_ground_truth, oracle_no_ground_truth, cell_oracle_threshold, num_edges)
+                
         if num_edges not in result_dict['cell_oracle']:
             result_dict['cell_oracle'][num_edges] = {}
         result_dict['cell_oracle'][num_edges] = cell_oracle_summary_dict
@@ -318,87 +171,35 @@ def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_g
         
 
 def calculate_and_plot_auroc_auprc(
-    ground_truth_with_scores: pd.DataFrame,
-    cell_oracle_subset: pd.DataFrame,
-    linger_network_subset: pd.DataFrame,
+    accuracy_metrics_dict: dict,
     result_dir: str
     ):
     """Plots the AUROC and AUPRC"""
     
-    # Create a deepcopy of the ground truth for each inference method
-    oracle_ground_truth = deepcopy(ground_truth_with_scores)
-    linger_ground_truth = deepcopy(ground_truth_with_scores)
-    
-    # rename the inference method score column to "Score" to match the inferred dataset (for concatenating)
-    oracle_ground_truth = oracle_ground_truth.rename(columns={'Oracle_Score': 'Score'})
-    linger_ground_truth = linger_ground_truth.rename(columns={'Linger_Score': 'Score'})
-    
-    def calculate_roc_prc(ground_truth: pd.DataFrame, inferred_df: pd.DataFrame):
-        # Classify non-ground truth scores for Oracle
-        df_ground_truth = ground_truth.copy()
-        inferred_df["Score"] = inferred_df["Score"]
-        df_ground_truth["Score"] = df_ground_truth["Score"]
-        
-        # Calculate mean and standard deviation of ground truth Oracle scores
-        mean = df_ground_truth['Score'].mean()
-        stdev = df_ground_truth['Score'].std()
-
-        # Define the lower threshold
-        threshold = mean - 1 * stdev
-        
-        # Classify ground truth scores for Oracle
-        df_ground_truth['true_interaction'] = 1
-        df_ground_truth['predicted_interaction'] = np.where(
-            df_ground_truth['Score'] >= threshold, 1, 0)
-
-        inferred_df['true_interaction'] = 0
-        inferred_df['predicted_interaction'] = np.where(
-            inferred_df['Score'] >= threshold, 1, 0)
-
-        auc_df = pd.concat([
-            df_ground_truth[['Source', 'Target', 'Score', 'true_interaction', 'predicted_interaction']],
-            inferred_df[['Source', 'Target', 'Score', 'true_interaction', 'predicted_interaction']]
-        ], ignore_index=True).dropna()
-        
-        # Concatenate Oracle dataframes for AUC analysis
-        y_true = auc_df['true_interaction']
-        y_scores = auc_df['Score']
-
-        return y_true, y_scores
-    
-    # Find the true interactions vs all scores
-    y_true_oracle, y_scores_oracle = calculate_roc_prc(oracle_ground_truth, cell_oracle_subset)
-    y_true_linger, y_scores_linger = calculate_roc_prc(linger_ground_truth, linger_network_subset)
-    
-    # Calculate ROC and PRC for Oracle Scores if positives are present
-    fpr_oracle, tpr_oracle, _ = roc_curve(y_true_oracle, y_scores_oracle)
-    precision_oracle, recall_oracle, _ = precision_recall_curve(y_true_oracle, y_scores_oracle)
-    
-    roc_auc_oracle = roc_auc_score(y_true_oracle, y_scores_oracle)
-    prc_auc_oracle = average_precision_score(y_true_oracle, y_scores_oracle)
-    
-    # Calculate ROC and PRC for Oracle Scores if positives are present
-    fpr_linger, tpr_linger, _ = roc_curve(y_true_linger, y_scores_linger)
-    precision_linger, recall_linger, _ = precision_recall_curve(y_true_linger, y_scores_linger)
-    
-    roc_auc_linger = auc(fpr_linger, tpr_linger)
-    prc_auc_linger = auc(recall_linger, precision_linger)
-
     # Define figure and subplots for combined AUROC and AUPRC plots
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     
-    # Plot combined AUROC
-    axes[0].plot(fpr_oracle, tpr_oracle, label=f'Oracle AUROC = {roc_auc_oracle:.2f}', color='blue')
-    axes[0].plot(fpr_linger, tpr_linger, label=f'Linger AUROC = {roc_auc_linger:.2f}', color='orange')
-    axes[0].plot([0, 1], [0, 1], 'k--')  # Diagonal line for random performance
+    for method, score_dict in enumerate(accuracy_metrics_dict.items()):
+        y_true = score_dict['y_true']
+        y_scores = score_dict['y_scores']
+        
+        fpr, tpr = roc_curve(y_true, y_scores)
+        precision, recall, _ = precision_recall_curve(y_true, y_scores)
+        roc_auc = roc_auc_score(y_true, y_scores)
+        prc_auc = auc(recall, precision)
+        
+        axes[0].plot(fpr, tpr, label=f'{method} AUROC = {roc_auc:.2f}', color='blue')
+        axes[0].plot([0, 1], [0, 1], 'k--')  # Diagonal line for random performance
+        
+        axes[1].plot(recall, precision, label=f'{method} AUPRC = {prc_auc:.2f}', color='blue')
+        
+        
     axes[0].set_title("Combined AUROC")
     axes[0].set_xlabel("False Positive Rate")
     axes[0].set_ylabel("True Positive Rate")
     axes[0].legend(loc="lower right")
-
-    # Plot combined AUPRC
-    axes[1].plot(recall_oracle, precision_oracle, label=f'Oracle AUPRC = {prc_auc_oracle:.2f}', color='blue')
-    axes[1].plot(recall_linger, precision_linger, label=f'Linger AUPRC = {prc_auc_linger:.2f}', color='orange')
+        
+        
     axes[1].set_title("Combined AUPRC")
     axes[1].set_xlabel("Recall")
     axes[1].set_ylabel("Precision")
@@ -408,102 +209,7 @@ def calculate_and_plot_auroc_auprc(
     fig.tight_layout()
     plt.savefig(f'{result_dir}/5000_cell_oracle_linger_auroc_auprc.png', dpi=200)
     plt.show()
-
-
-def plot_histogram(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
-    # Define the figure and two subplots
-    plt.figure(figsize=(18, 8))
-
-    # Plot the Oracle histogram
-    plt.subplot(1, 2, 1)
-    plt.hist(np.log2(cell_oracle_subset['Score'].dropna()), bins=150, alpha=0.7, label='Non-ground truth scores')
-    plt.hist(np.log2(ground_truth_with_scores['Oracle_Score'].dropna()), bins=150, alpha=0.7, label='Ground truth scores')
-    plt.title("Oracle Score Distribution")
-    plt.xlabel("log2 Oracle Score")
-    plt.ylabel("Frequency")
-
-    # Plot the Linger histogram
-    plt.subplot(1, 2, 2)
-    plt.hist(np.log2(linger_network_subset['Score'].dropna()), bins=150, alpha=0.7, label='Non-ground truth scores')
-    plt.hist(np.log2(ground_truth_with_scores['Linger_Score'].dropna()), bins=150, alpha=0.7, label='Ground truth scores')
-    plt.title("Linger Score Distribution")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.xlabel("log2 Linger Score")
-    plt.ylabel("Frequency")
-
-    # Adjust layout and show the plot
-    plt.tight_layout()
-    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histograms.png')
     
-
-def plot_histogram_with_thresholds(ground_truth_with_scores: pd.DataFrame, linger_network_subset: pd.DataFrame, cell_oracle_subset: pd.DataFrame, result_dir: str):
-    
-    def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, score_col: str):
-    
-        # Set the ground truth and inferred network scores to log2 scale
-        inferred_network["Score"] = np.log2(inferred_network["Score"])
-        ground_truth[score_col] = np.log2(ground_truth[score_col])
-        
-        # Set the threshold for the accuracy metrics based on the ground truth mean
-        mean = ground_truth[score_col].mean()
-        std = ground_truth[score_col].std()
-        
-        threshold = mean - 1 * std
-        
-        tp = ground_truth[ground_truth[score_col] >= threshold][score_col]
-        fn = ground_truth[ground_truth[score_col] < threshold][score_col]
-        
-        fp = inferred_network[inferred_network["Score"] >= threshold]["Score"]
-        tn = inferred_network[inferred_network["Score"] < threshold]["Score"]
-        
-        return tp, fp, tn, fn, threshold
-    
-    tp_oracle, fp_oracle, tn_oracle, fn_oracle, oracle_threshold = find_inferred_network_accuracy_metrics(
-        ground_truth_with_scores, cell_oracle_subset, "Oracle_Score"
-        )
-    
-    tp_linger, fp_linger, tn_linger, fn_linger, linger_threshold = find_inferred_network_accuracy_metrics(
-        ground_truth_with_scores, linger_network_subset, "Linger_Score"
-        )
-    
-    plt.figure(figsize=(18, 8))
-    
-    # Plot the Oracle_Score histogram
-    plt.subplot(1, 2, 1)
-
-    # Plot histograms for Oracle Score categories with calculated bin sizes
-    plt.hist(tn_oracle, bins=75, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    plt.hist(fp_oracle, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
-    plt.hist(fn_oracle, bins=75, alpha=1, color='#efc69f', label='False Negative (FN)')
-    plt.hist(tp_oracle, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
-
-    
-    # Plot Oracle threshold line
-    plt.axvline(x=oracle_threshold, color='black', linestyle='--', linewidth=2)
-    plt.title("CellOracle Score Distribution")
-    plt.xlabel("log2 CellOracle Score")
-    plt.ylabel("Frequency")
-
-    # Plot the Linger_Score histogram
-    plt.subplot(1, 2, 2)
-
-    # Plot histograms for Linger Score categories
-    plt.hist(tn_linger, bins=150, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    plt.hist(fp_linger, bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
-    plt.hist(fn_linger, bins=150, alpha=1, color='#efc69f', label='False Negative (FN)')
-    plt.hist(tp_linger, bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
-
-    # Plot Linger threshold line
-    plt.axvline(x=linger_threshold, color='black', linestyle='--', linewidth=2)
-    plt.title("LINGER Score Distribution")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.xlabel("log2 LINGER Score")
-    plt.ylabel("Frequency")
-
-    # Adjust layout and save the plot
-    plt.tight_layout()
-    plt.savefig(f'{result_dir}/5000_cell_oracle_linger_histogram_with_accuracy_threshold.png')
-
 
 if __name__ == '__main__':
     
@@ -542,6 +248,8 @@ if __name__ == '__main__':
     
     method_score_distribution_dict: dict = {}
     
+    accuracy_metric_dict: dict = {}
+    
     # Process the ground truth and inferred networks
     print('\n----- Processing inferred networks and ground truths -----')
     for method, inferred_network_df in inferred_network_dict.items():
@@ -578,7 +286,16 @@ if __name__ == '__main__':
         print(f"\tTrue Negatives: {accuracy_metrics['true_negative']:,}")
         print(f"\tFalse Positives: {accuracy_metrics['false_positive']:,}")
         print(f"\tFalse Negatives: {accuracy_metrics['false_negative']:,}")
+        
+        accuracy_metric_dict[method] = accuracy_metrics
+        
+        ground_truth_dict[method] = method_ground_truth
+        inferred_network_dict[method] = inferred_network_no_ground_truth_df
     
     helper_functions.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_network_dict, result_dir)
+    
+    calculate_and_plot_auroc_auprc(accuracy_metric_dict, "./")
+    
+    
     
     
