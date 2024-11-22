@@ -59,7 +59,7 @@ barcodes = pd.DataFrame(rna_data.columns.values, columns=[0])
 
 label = pd.DataFrame({
     'barcode_use': barcodes[0].values,  # Use the same barcodes as in the RNA and ATAC data
-    'label': ['mESC'] * len(barcodes)  # Set the label to "mESC" for all cells
+    'label': ['macrophage'] * len(barcodes)  # Set the label to "mESC" for all cells
 })
 
 # ---------------------------------------------------

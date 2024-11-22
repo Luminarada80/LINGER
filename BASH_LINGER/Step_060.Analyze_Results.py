@@ -22,17 +22,15 @@ rcParams.update({
     'legend.fontsize': 14  # Legend font size
 })
 
-from linger import Benchmk
-
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-CELL_TYPE = 'mESC' # H1
+CELL_TYPE = 'macrophage' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
-    'mESC': 'all',
+    'macrophage': 'all'
 }
 # ----------------------------------------------------------------
 
