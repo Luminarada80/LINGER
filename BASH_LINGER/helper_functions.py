@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 import math
+import scanpy as sc
 from typing import TextIO
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -376,7 +377,7 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
         lower_threshold = np.mean(ground_truth_scores) - np.std(ground_truth_scores)
 
         # Define consistent bin edges for the entire dataset
-        num_bins = 150
+        num_bins = 300
         bin_edges = np.histogram_bin_edges(
             np.concatenate([ground_truth_scores, inferred_scores]), bins=num_bins
         )
@@ -401,6 +402,7 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
         plt.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2)
         plt.title(f"{method_name} Score Distribution")
         plt.xlabel(f"log2 {method_name} Score")
+        plt.xlim([-20,20])
         plt.ylabel("Frequency")
         
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
@@ -456,3 +458,61 @@ def plot_histogram_with_threshold(
     ax.legend()
 
     return fig
+
+def plot_cell_expression_histogram(
+    adata_rna: sc.AnnData, 
+    output_dir: str, 
+    cell_type: str = None,
+    ymin: int | float = 0,
+    ymax: int | float = 100,
+    xmin: int | float = 0,
+    xmax: int | float = None,
+    filename: str = 'avg_gene_expr_hist',
+    filetype: str = 'png'
+    
+    ):
+    """
+    Plots a histogram showing the distribution of cell gene expression by percent of the population.
+    
+    Assumes the data has cells as columns and genes as rows
+
+    Args:
+        adata_rna (sc.AnnData):
+            scRNAseq dataset with cells as columns and genes as rows
+        output_dir (str):
+            Directory to save the graph in
+        cell_type (str):
+            Can specify the cell type if the dataset is a single cell type
+        ymin (int | float):
+            The minimum y-axis value (in percentage, default = 0)
+        ymax (int | float):
+            The maximum y-axis value (in percentage, default = 100)
+        xmin (int | float):
+            The minimum x-axis value (default = 0)
+        xmax (int | float):
+            The maximum x-axis value
+        filename (str):
+            The name of the file to save the figure as
+        filetype (str):
+            The file extension of the figure (default = png)
+    """        
+    
+    n_cells = adata_rna.shape[0]
+    n_genes = adata_rna.shape[1]
+    
+    # Create the histogram and calculate bin heights
+    plt.hist(adata_rna.obs["n_genes"], bins=30, edgecolor='black', weights=np.ones_like(adata_rna.obs["n_genes"]) / n_cells * 100)
+    
+    if cell_type == None:
+        plt.title(f'Distribution of the number of genes expressed by cells in the dataset')
+    else: 
+        plt.title(f'Distribution of the number of genes expressed by {cell_type}s in the dataset')
+        
+    plt.xlabel(f'Number of genes expressed ({n_genes} total genes)')
+    plt.ylabel(f'Percentage of cells ({n_cells} total cells)')
+    
+    plt.yticks(np.arange(0, min(ymax, 100) + 1, 5), [f'{i}%' for i in range(0, min(ymax, 100) + 1, 5)])
+    plt.ylabel(f'Percentage of cells ({n_cells} total cells)')
+    
+    plt.savefig(f'{output_dir}/{filename}.{filetype}', dpi=300)
+    plt.close()

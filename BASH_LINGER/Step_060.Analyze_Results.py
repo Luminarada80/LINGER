@@ -160,14 +160,46 @@ def process_tf_tg_pairs(ground_truth: pd.DataFrame, trans_reg_network: pd.DataFr
     tf_list, tg_list, value_list = [], [], []
     num_nan: int = 0
     num_rows: int = 0
+    print(trans_reg_network.head())
 
     for index, row in ground_truth.iterrows():
         try:
             tf, tg = row['Source'], row['Target']
 
             # The TF and TG names have to be capitalized like in the TRP score dataset
-            tf = str(tf).capitalize()
-            tg = str(tg).capitalize()
+            tf = str(tf).upper()
+            tg = str(tg).upper()
+        
+            # If looking at a cell type, only use TFs specific to that cell type
+            # Check if the TF is in the cell type-specific TF list
+            if CELL_POP == False:
+
+                # # Finds only the TFs in the cell type or all of them if 'all' is the value for the cell type
+                # if tf in CELL_TYPE_TF_DICT[CELL_TYPE] or 'all' in CELL_TYPE_TF_DICT[CELL_TYPE]:
+                try:
+                    # Get the trans-regulatory score for the TF-TG pair
+                    
+                    value = trans_reg_network.loc[tg, tf]
+                    tf_list.append(tf)
+                    tg_list.append(tg)
+                    value_list.append(value)
+                    
+                except KeyError:
+                    # Handle missing value case
+                    num_nan += 1
+            
+            # If using the cell population, use all TFs
+            else:
+                try:
+                    # Get the trans-regulatory score for the TF-TG pair
+                    value = trans_reg_network.loc[tg, tf]
+                    tf_list.append(tf)
+                    tg_list.append(tg)
+                    value_list.append(value)
+
+                except KeyError:
+                    # Handle missing value case
+                    num_nan += 1
 
         # Catch the exception where the ground truth separator is different than the separatoor specified 
         # in load_ground_truth()
@@ -179,34 +211,6 @@ def process_tf_tg_pairs(ground_truth: pd.DataFrame, trans_reg_network: pd.DataFr
             sys.exit("Script terminated due to KeyError. Please resolve the issue and try again.")
 
         
-        # If looking at a cell type, only use TFs specific to that cell type
-        # Check if the TF is in the cell type-specific TF list
-        if CELL_POP == False:
-
-            # Finds only the TFs in the cell type or all of them if 'all' is the value for the cell type
-            if tf in CELL_TYPE_TF_DICT[CELL_TYPE] or 'all' in CELL_TYPE_TF_DICT[CELL_TYPE]:
-                try:
-                    # Get the trans-regulatory score for the TF-TG pair
-                    value = trans_reg_network.loc[tg.capitalize(), tf.capitalize()]
-                    tf_list.append(tf)
-                    tg_list.append(tg)
-                    value_list.append(value)
-                except KeyError:
-                    # Handle missing value case
-                    num_nan += 1
-        
-        # If using the cell population, use all TFs
-        else:
-            try:
-                # Get the trans-regulatory score for the TF-TG pair
-                value = trans_reg_network.loc[tg, tf]
-                tf_list.append(tf)
-                tg_list.append(tg)
-                value_list.append(value)
-
-            except KeyError:
-                # Handle missing value case
-                num_nan += 1
 
         
         num_rows += 1
@@ -708,16 +712,6 @@ def main():
     tf_re_binding, cis_reg_network, trans_reg_network = load_data()
     ground_truth = load_ground_truth()
 
-    # ----- GENERAL INFORMATION -----
-    logging.info(f'\n----- TF-RE Binding Potential -----')
-    logging.info(f'REs (rows): {tf_re_binding.shape[0]}')
-    logging.info(f'TFs (columns): {tf_re_binding.shape[1]}')
-    logging.info(tf_re_binding.head())
-
-    logging.info(f'\n----- Cis-Regulatory Network -----')
-    logging.info(f'Network size: {cis_reg_network.shape[0]}')
-    logging.info(cis_reg_network.head())
-
     logging.info(f'\n----- Trans-Regulatory Network -----')
     logging.info(f'Number of TFs (columns): {trans_reg_network.shape[1]}')
     logging.info(f'Number of TGs (rows): {trans_reg_network.shape[0]}')
@@ -839,6 +833,12 @@ def main():
 
     plot_trans_reg_distribution_with_thresholds(ground_truth_df, trans_reg_minus_ground_truth_df, y_log=False)
 
+    import helper_functions
+    ground_truth_dict = {'linger': ground_truth_df}
+    inferred_net_dict = {'linger': trans_reg_minus_ground_truth_df}
+    
+    helper_functions.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_net_dict, result_dir=f'{RESULT_DIR}/{CELL_TYPE}')
+    
     # Plot a box and whisker plot of the trans-regulatory potential scores and ground truth scores
     plot_box_whisker(trans_reg_minus_ground_truth_df, ground_truth_df)
 

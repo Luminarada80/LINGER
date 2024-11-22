@@ -27,7 +27,7 @@ rcParams.update({
 LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS'
 
 # List the directories to the resource logging files for each sample
-# SAMPLE_LIST = ["sample_1000", "sample_2000", "sample_3000", "sample_4000", "sample_5000"]
+SAMPLE_LIST = ["macrophage_1", "macrophage_2", "macrophage_3", "macrophage_4"]
 
 def parse_wall_clock_time(line):
     # Extract the time part after the last mention of 'time'
@@ -51,7 +51,8 @@ def parse_wall_clock_time(line):
 
     # Calculate total time in seconds
     total_seconds = seconds + (minutes * 60) + (hours * 3600)
-    return total_seconds
+    hours = total_seconds * 0.0002778
+    return hours
 
 def plot_metric_by_step_adjusted(sample_resource_dict, metric, ylabel, title, filename, divide_by_cpu=False):
     """
@@ -67,7 +68,7 @@ def plot_metric_by_step_adjusted(sample_resource_dict, metric, ylabel, title, fi
     """
     # Extract the metric data for each sample and step
     samples = sorted(sample_resource_dict.keys())
-    steps = [f'Step_0{i}0' for i in range(1, 6)]
+    steps = [f'Step_0{i}0' for i in [1, 2, 3, 5]]
     
     metric_data = {sample: [
         (sample_resource_dict[sample][step][metric] / sample_resource_dict[sample][step]['percent_cpu'] 
@@ -152,7 +153,7 @@ if __name__ == '__main__':
     # Define a dictionary to hold the sample names with their resource requirements for each step in the pipeline
     sample_resource_dict = {}
     
-    samples = ["E7.5", "E7.75", "E8.0"]
+    samples = ["1", "2", "3", "4"]
     
     sample_list = [
         sample_dir for sample_dir in os.listdir(LOG_DIR)
@@ -200,27 +201,27 @@ if __name__ == '__main__':
     plot_metric_by_step_adjusted(
         sample_resource_dict=sample_resource_dict,
         metric='user_time',
-        ylabel='User Time (s) / Percent CPU Usage',
+        ylabel='User Time (h) / Percent CPU Usage',
         title='User Time / Percent CPU Usage by Step for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Step_User_Time_Summary.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Step_User_Time_Summary.png',
         divide_by_cpu=True
     )
 
     plot_metric_by_step_adjusted(
         sample_resource_dict=sample_resource_dict,
         metric='system_time',
-        ylabel='System Time (s) / Percent CPU Usage',
+        ylabel='System Time (h) / Percent CPU Usage',
         title='System Time / Percent CPU Usage by Step for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Step_System_Time.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Step_System_Time.png',
         divide_by_cpu=True
     )
 
     plot_metric_by_step_adjusted(
         sample_resource_dict=sample_resource_dict,
         metric='wall_clock_time',
-        ylabel='Wall Clock Time (s)',
+        ylabel='Wall Clock Time (h)',
         title='Wall Clock Time by Step for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Wall_Clock_Time.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Step_Wall_Clock_Time.png',
         divide_by_cpu=False
     )
 
@@ -229,7 +230,7 @@ if __name__ == '__main__':
         metric='max_ram',
         ylabel='Max RAM Usage (GB)',
         title='Max RAM usage by Step for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Max_Ram.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Step_Max_Ram.png',
         divide_by_cpu=False
     )
 
@@ -238,7 +239,7 @@ if __name__ == '__main__':
         metric='percent_cpu',
         ylabel='Percent CPU',
         title='Percent of the CPU Used',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Step_Percent_Cpu.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Step_Percent_Cpu.png',
         divide_by_cpu=False
     )
 
@@ -248,7 +249,7 @@ if __name__ == '__main__':
         metric='user_time',
         ylabel='Total User Time / Percent CPU Usage',
         title='Total User Time / Percent CPU Usage for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_User_Time.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_User_Time.png',
         divide_by_cpu=True
     )
 
@@ -257,16 +258,16 @@ if __name__ == '__main__':
         metric='system_time',
         ylabel='Total System Time / Percent CPU Usage',
         title='Total System Time / Percent CPU Usage for Each Sample',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_System_Time.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_System_Time.png',
         divide_by_cpu=True
     )
 
     plot_total_metric_by_sample(
         sample_resource_dict=sample_resource_dict,
         metric='wall_clock_time',
-        ylabel='Wall Clock Time (s)',
+        ylabel='Wall Clock Time (h)',
         title='Total Wall Clock Time',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Wall_Clock_Time.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_Wall_Clock_Time.png',
         divide_by_cpu=False
     )
 
@@ -275,7 +276,7 @@ if __name__ == '__main__':
         metric='max_ram',
         ylabel='Max RAM Usage (GB)',
         title='Max RAM usage',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_Max_Ram.png',
         divide_by_cpu=False
     )
 
@@ -284,7 +285,7 @@ if __name__ == '__main__':
         metric='max_ram',
         ylabel='Max RAM Usage (GB)',
         title='Max RAM usage',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Max_Ram.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_Max_Ram.png',
         divide_by_cpu=False
     )
 
@@ -293,7 +294,7 @@ if __name__ == '__main__':
         metric='percent_cpu',
         ylabel='Percent CPU',
         title='Average Percent of the CPU Used',
-        filename=f'{shared_variables.results_dir}/resource_analysis/Total_Percent_Cpu.png',
+        filename=f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Total_Percent_Cpu.png',
         divide_by_cpu=False
     )
 
@@ -326,4 +327,4 @@ if __name__ == '__main__':
     summary_df = summary_df.reindex(sorted(summary_df.columns), axis=1)
     print(summary_df.head())
 
-    summary_df.to_csv(f'{shared_variables.results_dir}/resource_analysis/Resource_Summary.tsv', sep='\t')
+    summary_df.to_csv(f'{shared_variables.results_dir}/RESOURCE_ANALYSIS/Resource_Summary.tsv', sep='\t')
