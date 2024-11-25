@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import coo_matrix
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, csc_matrix, coo_matrix
 from tqdm import tqdm
 import torch
 import csv
@@ -2010,76 +2009,53 @@ def cis_reg(
     result.to_csv(outdir + 'cell_population_cis_regulatory.txt', sep='\t', header=None, index=None)
 
 
-def cell_type_specific_cis_reg_chr(
-    GRNdir: str, 
-    adata_RNA, 
-    adata_ATAC, 
-    genome: str, 
-    chrN: str, 
-    celltype: str, 
-    outdir: str
-) -> pd.DataFrame:
-    """
-    Computes cell-type-specific cis-regulatory interactions between regulatory elements (REs) and target genes (TGs)
-    for a specific chromosome. The function processes ATAC-seq and RNA-seq data for a given cell type to identify
-    regulatory interactions, taking into account both cis-regulatory and distance-based interactions.
+def cell_type_specific_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,celltype,outdir): 
+    import numpy as np
+    import pandas as pd
+    from scipy.sparse import csc_matrix
+    from scipy.sparse import coo_matrix
+    O_overlap, N_overlap,O_overlap_u,N_overlap_u,O_overlap_hg19_u=load_region(GRNdir,genome,chrN,outdir)
+    sparse_S,TGset=load_RE_TG(GRNdir,chrN,O_overlap_u,O_overlap_hg19_u,O_overlap)
+    label=adata_RNA.obs['label'].values.tolist()
+    labelset=list(set(label))
+    mask = adata_RNA.obs['label'] == celltype  # Create a boolean mask for celltype
 
-    Parameters:
-        GRNdir (str):
-            The directory path where the gene regulatory network (GRN) files are stored.
-        adata_RNA (AnnData):
-            An AnnData object containing single-cell RNA-seq data.
-        adata_ATAC (AnnData):
-            An AnnData object containing single-cell ATAC-seq data.
-        genome (str):
-            The genome version (e.g., 'hg19' or 'hg38').
-        chrN (str):
-            The chromosome number (e.g., 'chr1') used to load the specific files.
-        celltype (str):
-            The specific cell type for which to compute the cis-regulatory interactions.
-        outdir (str):
-            The directory path where the output files are stored.
+    # Compute mean ATAC values
+    temp = adata_ATAC.X[mask, :].mean(axis=0).T  # This produces a row vector
+    RE = pd.DataFrame(temp.reshape(-1, 1), index=adata_ATAC.var['gene_ids'].values, columns=['values'])
 
-    Returns:
-        pd.DataFrame:
-            A DataFrame containing the computed cis-regulatory interactions. The DataFrame includes the following columns:
-            1. RE: Regulatory Element
-            2. TG: Target Gene
-            3. Score: Interaction score based on cis-regulatory and distance-based data.
-    """
+    # Compute mean RNA values
+    temp = adata_RNA.X[mask, :].mean(axis=0).T  # This produces a row vector
+    TG = pd.DataFrame(temp.reshape(-1, 1), index=adata_RNA.var['gene_ids'].values, columns=['values'])
 
-    # Load the genomic overlap information for the specified chromosome
-    O_overlap, N_overlap, O_overlap_u, N_overlap_u, O_overlap_hg19_u = load_region(GRNdir, genome, chrN, outdir)
-
-    # Load the RE-TG interaction matrix for the chromosome
-    sparse_S, TGset = load_RE_TG(GRNdir, chrN, O_overlap_u, O_overlap_hg19_u, O_overlap)
-
-    # Extract the labels (cell types) from RNA-seq data
-    label = adata_RNA.obs['label'].values.tolist()
-    labelset = list(set(label))
-
-    # Compute mean ATAC-seq values for the specific cell type
-    temp = adata_ATAC.X[np.array(label) == celltype, :].mean(axis=0).T
-    RE = pd.DataFrame(temp, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
-
-    # Compute mean RNA-seq values for the specific cell type
-    temp = adata_RNA.X[np.array(label) == celltype, :].mean(axis=0).T
-    TG = pd.DataFrame(temp, index=adata_RNA.var['gene_ids'].values, columns=['values'])
-
-    del temp  # Clear the temporary variable to free up memory
-
-    # Extract the overlapped peaks and normalize the RE data
-    RE = RE.loc[N_overlap]
-
-    # Find the overlapping target genes between TGset and the RNA-seq data
-    TGoverlap = list(set(TGset) & set(TG.index))
-
-    # Filter the sparse RE-TG interaction matrix for the overlapping target genes
+    del temp
+    ## cell annotation
+    ## extact the overlapped peaks.
+    RE=RE.loc[N_overlap]
+    ## select the genes
+    TGoverlap=list(set(TGset)&set(TG.index))
+    #target_col_indices = [col_dict[col] for col in TGoverlap]
     sparse_S = sparse_S[TGoverlap]
-
-    # Filter the RNA-seq data for the overlapping target genes
-    TG = TG.loc
-
+    TG=TG.loc[TGoverlap]
+    sparse_dis=load_RE_TG_distance(GRNdir,chrN,O_overlap_hg19_u,O_overlap_u,O_overlap,TGoverlap)
+    sparse_S+=0.1
+    ## cell annotation
+    TG_temp=TG.values#[:,np.array(label)==celltype].mean(axis=1)
+    TG_temp=TG_temp/TG_temp.mean()+0.1
+    RE_temp=RE.values#[:,np.array(label)==celltype].mean(axis=1)
+    RE_temp=RE_temp/RE_temp.mean()+0.1
+    Score=csc_matrix(RE_temp).multiply(sparse_S.values).multiply(sparse_dis.values).multiply(csc_matrix(TG_temp.T)).toarray()
+    Score=pd.DataFrame(Score,index=N_overlap,columns=TGoverlap)
+    Score=Score.groupby(Score.index).max()
+    data = Score.values[Score.values!=0] 
+    rows, cols = np.nonzero(Score.values) 
+    coo = coo_matrix((data,(rows,cols)),shape=Score.shape)
+    combined = np.zeros([len(data),3], dtype=object) 
+    combined[:,0]=Score.index[coo.row]
+    combined[:,1]=np.array(TGoverlap)[coo.col]
+    combined[:,2]=coo.data
+    resultall=pd.DataFrame(combined)
+    return resultall  
 
 def cell_type_specific_cis_reg_scNN(
     distance: csr_matrix, 

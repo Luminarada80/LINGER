@@ -99,7 +99,7 @@ def load_data():
 def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
-    ground_truth: pd.DataFrame = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep=' ', header=None)
+    ground_truth: pd.DataFrame = pd.read_csv(CHIP_SEQ_GROUND_TRUTH_PATH, sep='\t', header=None)
     return ground_truth
 
 
@@ -430,6 +430,9 @@ def main():
     # ----- DATA LOADING -----
     tf_re_binding, cis_reg_network, trans_reg_network = load_data()
     ground_truth = load_ground_truth()
+    
+    # Extract just the 'Source' and 'Target' columns
+    ground_truth = ground_truth[['Source', 'Target']]
 
     # ----- GENERAL INFORMATION -----
     logging.info(f'\n----- TF-RE Binding Potential -----')
