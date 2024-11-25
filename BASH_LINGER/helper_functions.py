@@ -3,9 +3,11 @@ import pandas as pd
 import math
 import scanpy as sc
 from typing import TextIO
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score, precision_recall_curve
 import matplotlib.pyplot as plt
 import numpy as np
+import re
+import os
 
 from matplotlib import rcParams
 
@@ -37,10 +39,12 @@ def log_and_write(file: TextIO, message: str) -> None:
 def source_target_cols_uppercase(df: pd.DataFrame) -> pd.DataFrame:
     """Converts the Source and Target columns to uppercase for a dataframe
     
-    Args:
+    Parameters
+    ----------
         df (pd.DataFrame): GRN dataframe with "Source" and "Target" gene name columns
 
-    Returns:
+    Returns
+    ----------
         pd.DataFrame: The same dataframe with uppercase gene names
     """
     df["Source"] = df["Source"].str.upper()
@@ -56,7 +60,8 @@ def create_standard_dataframe(
     Standardizes inferred GRN dataframes to have three columns with "Source", "Target", and "Score".
     Makes all TF and TG names uppercase.
     
-    Parameters:
+    Parameters
+    ----------
         inferred_network_df (pd.dataframe):
             Inferred GRN dataframe
         
@@ -69,10 +74,15 @@ def create_standard_dataframe(
         score_col (str):
             The column name that should be used as the score. Default is "Score"
     
-    Returns:
+    Returns
+    ----------
         standardized_df (pd.DataFrame):
             A dataframe with three columns: "Source", "Target, and "Score"
     """
+    
+    # Check to make sure the dataframe is input correctly
+    if inferred_network_df.empty:
+        raise ValueError("The input dataframe is empty. Please provide a valid dataframe.")
 
     source_col = source_col.capitalize() if source_col else "Source"
     target_col = target_col.capitalize() if target_col else "Target"
@@ -81,15 +91,16 @@ def create_standard_dataframe(
     # Capitalize the column names for consistency
     inferred_network_df.columns = inferred_network_df.columns.str.capitalize()
         
-    
     # Detect if the DataFrame needs to be melted
-    if "Source" in inferred_network_df.columns and "Target" in inferred_network_df.columns:
-        # print("\nDataFrame appears to be in long format; no melting is required.")
-                        
+    if "Source" in inferred_network_df.columns and "Target" in inferred_network_df.columns:  
+        # Make sure that the gene names are all strings and dont include whitespace
+        inferred_network_df["Source"] = inferred_network_df["Source"].astype(str).str.strip()
+        inferred_network_df["Target"] = inferred_network_df["Target"].astype(str).str.strip()
+                              
         # If no melting is required, we just rename columns directly
         melted_df = inferred_network_df.rename(columns={source_col: "Source", target_col: "Target", score_col: "Score"})
         
-        logging.info(f'\t{len(set(melted_df["Source"])):,} TFs, {len(set(melted_df["Target"])):,} TGs, and {len(melted_df["Score"]):,} edges')
+        logging.info(f'{len(set(melted_df["Source"])):,} TFs, {len(set(melted_df["Target"])):,} TGs, and {len(melted_df["Score"]):,} edges')
 
     
     # The dataframe needs to be melted, there are more than 3 columns and no "Source" or "Target" columns
@@ -130,8 +141,16 @@ def create_standard_dataframe(
     # Select and order columns as per new standard
     standardized_df = melted_df[["Source", "Target", "Score"]]
     
+    # # Remove any infinite and NaN values from the Score column
+    # standardized_df = standardized_df.replace([np.inf, -np.inf], np.nan)
+    # standardized_df = standardized_df.dropna(subset=["Score"])
+    
     logging.debug(f'\nNew df after standardizing:')
     logging.debug(standardized_df.head())
+    
+    # Validates the structure of the dataframe before returning it
+    assert all(col in standardized_df.columns for col in ["Source", "Target", "Score"]), \
+    "Standardized dataframe does not contain the required columns."
     
     return standardized_df
 
@@ -142,10 +161,11 @@ def add_inferred_scores_to_ground_truth(
     ) -> pd.DataFrame:
     
     """
-    Merges the inferred network scores with the ground truth dataframe, returns a ground truth network
+    Merges the inferred network Score with the ground truth dataframe, returns a ground truth network
     with a column containing the inferred Source -> Target score for each row.
     
-    Parameters:
+    Parameters
+    ----------
         ground_truth_df (pd.DataFrame):
             The ground truth dataframe. Columns should be "Source" and "Target"
             
@@ -154,6 +174,12 @@ def add_inferred_scores_to_ground_truth(
         
         score_column_name (str):
             Renames the "Score" column to a specific name, used if multiple datasets are being compared.
+    
+    Returns
+    ----------
+        ground_truth_with_scores (pd.DataFrame):
+            Ground truth dataframe with a "Score" column corresonding to the edge Score for each 
+            Target Source pair from the inferred network
     
     """
     # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
@@ -169,7 +195,6 @@ def add_inferred_scores_to_ground_truth(
         how="left"
     ).rename(columns={"Score": score_column_name})
 
-    
     return ground_truth_with_scores
 
 def remove_ground_truth_edges_from_inferred(
@@ -177,21 +202,23 @@ def remove_ground_truth_edges_from_inferred(
     inferred_network_df: pd.DataFrame
     ) -> pd.DataFrame:
     """
-    Removes ground truth edges from the inferred network after setting the ground truth scores.
+    Removes ground truth edges from the inferred network after setting the ground truth Score.
     
-    After this step, the inferred network does not contain any ground truth edge scores. This way, the 
-    inferred network and ground truth network scores can be compared.
+    After this step, the inferred network does not contain any ground truth edge Score. This way, the 
+    inferred network and ground truth network Score can be compared.
     
-    Parameters:
+    Parameters
+    ----------
         ground_truth_df (pd.DataFrame):
             Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
         
         inferred_network_df (pd.DataFrame):
             The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
 
-    Returns:
+    Returns
+    ----------
         inferred_network_no_ground_truth (pd.DataFrame):
-            The inferred GRN without the ground truth scores
+            The inferred GRN without the ground truth Score
     """
     # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
     source_target_cols_uppercase(ground_truth_df)
@@ -205,6 +232,18 @@ def remove_ground_truth_edges_from_inferred(
         ~inferred_network_df.apply(lambda row: (row['Source'], row['Target']) in ground_truth_edges, axis=1)
     ]
     
+    # Ensure there are no overlaps by checking for any TF-TG pairs that appear in both dataframes
+    overlap_check = pd.merge(
+        inferred_network_no_ground_truth[['Source', 'Target']], 
+        ground_truth_df[['Source', 'Target']], 
+        on=['Source', 'Target'], 
+        how='inner'
+    )
+
+    # Check to make sure there is no overlap between the ground truth and inferred networks
+    if overlap_check.shape[0] > 0:
+        logging.warning("There are still ground truth pairs in trans_reg_minus_ground_truth_df!")
+    
     return inferred_network_no_ground_truth
 
 def remove_tf_tg_not_in_ground_truth(
@@ -213,14 +252,27 @@ def remove_tf_tg_not_in_ground_truth(
     ) -> pd.DataFrame:
     
     """
-    Only keeps inferred network TFs and TGs that are also in the ground truth network.
+    Removes edges from the inferred network whether either the "Source" or "Target" gene is not
+    found in the ground truth network.
     
-    Parameters:
+    This allows for the evaluation of the GRN inference method by removing TFs and TGs that could
+    not be found in the ground truth. The inferred edges may exist, but they will be evaluated as 
+    incorrect if they are not seen in the ground truth network. This way, we can determine if an 
+    inferred edge is true or false by its presence in the ground truth network and inferred edge score.
+    
+    Parameters
+    ----------
         ground_truth_df (pd.DataFrame):
             Ground truth df with columns "Source" and "Target" corresponding to TFs and TGs
         
         inferred_network_df (pd.DataFrame):
             The inferred GRN df with columns "Source" and "Target" corresponding to TFs and TGs
+    
+    Returns
+    ----------
+        aligned_inferred_network (pd.DataFrame):
+            Returns the inferred network containing only rows with only edges where both the "Source"
+            and "Target" genes are found in the ground truth network.
     
     """
     # Make sure that ground truth and inferred network "Source" and "Target" columns are uppercase
@@ -244,56 +296,61 @@ def calculate_accuracy_metrics(
     inferred_network_df: pd.DataFrame,
     lower_threshold: int = None,
     num_edges_for_early_precision: int = 1000,
-    ):
+    ) -> tuple[dict, dict]:
     
     """
     Calculates accuracy metrics for an inferred network.
     
     Uses a lower threshold as the cutoff between true and false values. The 
     default lower threshold is set as 1 standard deviation below the mean 
-    ground truth scores.
+    ground truth Score.
     
-    True Positive: ground truth scores above the lower threshold
-    False Positive: non-ground truth scores above the lower threshold
-    True Negative: non-ground truth scores below the lower threshold
-    False Negative: ground truth scores below the lower threshold
+    True Positive: ground truth Score above the lower threshold
+    False Positive: non-ground truth Score above the lower threshold
+    True Negative: non-ground truth Score below the lower threshold
+    False Negative: ground truth Score below the lower threshold
     
-    Parameters:
+    Parameters
+    ----------
         ground_truth_df (pd.DataFrame):
-            The ground truth dataframe with inferred network scores
+            The ground truth dataframe with inferred network Score
             
         inferred_network_df (pd.DataFrame):
             The inferred GRN dataframe
 
-    Returns:
+    Returns
+    ----------
         summary_dict (dict):
-            A dictionary of the TP, TN, FP, and FN scores along with y_true and y_pred
-            
-        accuracy_metrics (dict):
+            A dictionary of the TP, TN, FP, and FN Score along with y_true and y_pred.
+                
+        confusion_matrix_score_dict (dict):
             A dictionary of the accuracy metrics and their values
 
     """
+        
+    if lower_threshold == None:
+        gt_mean = ground_truth_df['Score'].mean()
+        gt_std = ground_truth_df['Score'].std()
+
+        # Define the lower threshold
+        lower_threshold = gt_mean - 1 * gt_std
     
-    if not lower_threshold:
-        lower_threshold = np.mean(ground_truth_df['Score']) - np.std(ground_truth_df['Score']) 
-    
-    # Classify ground truth scores
+    # Classify ground truth Score
     ground_truth_df['true_interaction'] = 1
     ground_truth_df['predicted_interaction'] = np.where(
         ground_truth_df['Score'] >= lower_threshold, 1, 0)
 
-    # Classify non-ground truth scores (trans_reg_minus_ground_truth_df)
+    # Classify non-ground truth Score (trans_reg_minus_ground_truth_df)
     inferred_network_df['true_interaction'] = 0
     inferred_network_df['predicted_interaction'] = np.where(
         inferred_network_df['Score'] >= lower_threshold, 1, 0)
 
     # Concatenate dataframes for AUC and further analysis
     auc_df = pd.concat([ground_truth_df, inferred_network_df])
-    print(auc_df)
 
     # Calculate the confusion matrix
-    y_true = auc_df['true_interaction']
-    y_pred = auc_df['predicted_interaction']
+    y_true = auc_df['true_interaction'].dropna()
+    y_pred = auc_df['predicted_interaction'].dropna()
     y_scores = auc_df['Score'].dropna()
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     
@@ -317,17 +374,7 @@ def calculate_accuracy_metrics(
     early_fp = top_edges[top_edges['true_interaction'] == 0].shape[0]
     early_precision_rate = early_tp / (early_tp + early_fp)
     
-    accuracy_metrics = {
-        'true_positive': tp,
-        'true_negative': tn,
-        'false_positive': fp,
-        'false_negative': fn,
-        'y_true': y_true,
-        'y_pred': y_pred,
-        'y_scores': y_scores
-        }
-    
-    summary_dict = {
+    accuracy_metric_dict = {
         "precision": precision,
         "recall": recall,
         "specificity": specificity,
@@ -338,14 +385,29 @@ def calculate_accuracy_metrics(
         "early_precision_rate": early_precision_rate,
     }
     
-    return summary_dict, accuracy_metrics
+    confusion_matrix_score_dict = {
+        'true_positive': tp,
+        'true_negative': tn,
+        'false_positive': fp,
+        'false_negative': fn,
+        'y_true': y_true,
+        'y_pred': y_pred,
+        'y_scores': y_scores
+        }
+    
+    return accuracy_metric_dict, confusion_matrix_score_dict
 
-def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_network_dict: dict, result_dir: str) -> None:
+def plot_multiple_histogram_with_thresholds(
+    ground_truth_dict: dict,
+    inferred_network_dict: dict,
+    save_path: str
+    ) -> None:
     """
     Generates histograms of the TP, FP, TN, FN score distributions for each method. Uses a lower threshold of 1 stdev below
     the mean ground truth score. 
 
-    Args:
+    Parameters
+    ----------
         ground_truth_dict (dict): _description_
         inferred_network_dict (dict): _description_
         result_dir (str): _description_
@@ -360,7 +422,7 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
     num_cols = min(num_methods, max_cols)  # Up to 4 columns
     num_rows = math.ceil(num_methods / max_cols)  # Rows needed to fit all methods
 
-    print(f"Number of rows: {num_rows}, Number of columns: {num_cols}")
+    # print(f"Number of rows: {num_rows}, Number of columns: {num_cols}")
     
     plt.figure(figsize=(18, 8))
 
@@ -375,33 +437,39 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
         
         # Define the threshold
         lower_threshold = np.mean(ground_truth_scores) - np.std(ground_truth_scores)
+        
+        mean = np.mean(np.concatenate([ground_truth_scores, inferred_scores]))
+        std_dev = np.std(np.concatenate([ground_truth_scores, inferred_scores]))
 
-        # Define consistent bin edges for the entire dataset
-        num_bins = 300
-        bin_edges = np.histogram_bin_edges(
-            np.concatenate([ground_truth_scores, inferred_scores]), bins=num_bins
-        )
-
+        xmin = mean - 4 * std_dev
+        xmax = mean + 4 * std_dev
+        
         # Split data into below and above threshold
-        tp = ground_truth_scores[ground_truth_scores > lower_threshold]
-        fn = ground_truth_scores[ground_truth_scores <= lower_threshold]
+        tp = ground_truth_scores[(ground_truth_scores >= lower_threshold) & (ground_truth_scores < xmax)]
+        fn = ground_truth_scores[(ground_truth_scores <= lower_threshold) & (ground_truth_scores > xmin)]
         
-        fp = inferred_scores[inferred_scores >= lower_threshold]
-        tn = inferred_scores[inferred_scores < lower_threshold]
+        fp = inferred_scores[(inferred_scores >= lower_threshold) & (inferred_scores < xmax)]
+        tn = inferred_scores[(inferred_scores <= lower_threshold) & (inferred_scores > xmin)]
         
-        # Debugging: Print counts for each category
-        print(f"TP count: {len(tp)}, TN count: {len(tn)}, FP count: {len(fp)}, FN count: {len(fn)}")
+        # Define consistent bin edges for the entire dataset based on the number of values
+        num_bins = 200
+        all_scores = np.concatenate([tp, fn, fp, tn])
+        bin_edges = np.linspace(np.min(all_scores), np.max(all_scores), num_bins)
+        # bin_edges = np.sort(np.unique(np.append(bin_edges, lower_threshold)))
         
         # Plot histograms for Oracle Score categories with consistent bin sizes
         plt.hist(tn, bins=bin_edges, alpha=1, color='#b6cde0', label='True Negative (TN)')
+        plt.hist(fn, bins=bin_edges, alpha=1, color='#efc69f', label='False Negative (FN)')
+        
+        # Plot the positive values on top to make sure there is no ovelap
         plt.hist(fp, bins=bin_edges, alpha=1, color='#4195df', label='False Positive (FP)')
         plt.hist(tp, bins=bin_edges, alpha=1, color='#dc8634', label='True Positive (TP)')
-        plt.hist(fn, bins=bin_edges, alpha=1, color='#efc69f', label='False Negative (FN)')
 
-        # Plot Oracle threshold line
+        # Plot threshold line
         plt.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2)
-        plt.title(f"{method_name} Score Distribution")
-        plt.xlabel(f"log2 {method_name} Score")
+        plt.title(f"{method_name.capitalize()} Score Distribution")
+        plt.xlabel(f"log2 {method_name.capitalize()} Score")
+        plt.ylim(1, None)
         plt.xlim([-20,20])
         plt.ylabel("Frequency")
         
@@ -409,55 +477,8 @@ def plot_multiple_histogram_with_thresholds(ground_truth_dict: dict, inferred_ne
 
     # Adjust layout and save the plot
     plt.tight_layout()
-    plt.savefig(f'{result_dir}/Histogram_Multiple_Method_GRN_Scores.png')
-
-def find_inferred_network_accuracy_metrics(ground_truth: pd.DataFrame, inferred_network: pd.DataFrame, lower_threshold = None):
-
-    # Set the ground truth and inferred network scores to log2 scale
-    inferred_network["Score"] = np.log2(inferred_network["Score"])
-    ground_truth["Score"] = np.log2(ground_truth["Score"])
-    
-    # Set the default threshold as 1 stdev below the mean ground truth score
-    if lower_threshold == None:
-        mean = ground_truth["Score"].mean()
-        std = ground_truth["Score"].std()
-        
-        lower_threshold = mean - 1 * std
-    
-    true_positive_df: pd.DataFrame = ground_truth[ground_truth["Score"] >= lower_threshold]["Score"]
-    false_negative_df: pd.DataFrame = ground_truth[ground_truth["Score"] < lower_threshold]["Score"]
-    
-    false_positive_df: pd.DataFrame = inferred_network[inferred_network["Score"] >= lower_threshold]["Score"]
-    true_negative_df: pd.DataFrame = inferred_network[inferred_network["Score"] < lower_threshold]["Score"]
-    
-    return true_positive_df, false_positive_df, true_negative_df, false_negative_df
-
-def plot_histogram_with_threshold(
-    dataset_label: str,
-    true_negative_df: pd.DataFrame,
-    false_positive_df: pd.DataFrame,
-    false_negative_df: pd.DataFrame,
-    true_positive_df: pd.DataFrame,
-    lower_threshold: int | float = None
-    ) -> plt.Figure:
-    
-    # Create the figure and axes
-    fig, ax = plt.subplots()
-
-    # Plot histograms for Oracle Score categories with calculated bin sizes
-    ax.hist(true_negative_df.squeeze(), bins=75, alpha=1, color='#b6cde0', label='True Negative (TN)')
-    ax.hist(false_positive_df.squeeze(), bins=150, alpha=1, color='#4195df', label='False Positive (FP)')
-    ax.hist(false_negative_df.squeeze(), bins=75, alpha=1, color='#efc69f', label='False Negative (FN)')
-    ax.hist(true_positive_df.squeeze(), bins=150, alpha=1, color='#dc8634', label='True Positive (TP)')
-
-    # Plot Oracle threshold line
-    ax.axvline(x=lower_threshold, color='black', linestyle='--', linewidth=2)
-    ax.set_title(f"{dataset_label} Score Distribution")
-    ax.set_xlabel(f"log2 {dataset_label} Score")
-    ax.set_ylabel("Frequency")
-    ax.legend()
-
-    return fig
+    plt.savefig(f'{save_path}.png', dpi=200)
+    plt.close()
 
 def plot_cell_expression_histogram(
     adata_rna: sc.AnnData, 
@@ -476,7 +497,8 @@ def plot_cell_expression_histogram(
     
     Assumes the data has cells as columns and genes as rows
 
-    Args:
+    Parameters
+    ----------
         adata_rna (sc.AnnData):
             scRNAseq dataset with cells as columns and genes as rows
         output_dir (str):
@@ -516,3 +538,216 @@ def plot_cell_expression_histogram(
     
     plt.savefig(f'{output_dir}/{filename}.{filetype}', dpi=300)
     plt.close()
+    
+def create_randomized_inference_scores(    
+    ground_truth_df: pd.DataFrame,
+    inferred_network_df: pd.DataFrame,
+    lower_threshold: int = None,
+    num_edges_for_early_precision: int = 1000,
+    histogram_save_path: str = None
+    ):
+    
+    """
+    Uses random permutation to randomize the edge Score for inferred network and ground truth network dataframes.
+    Randomly reshuffles and calculates accuracy metrics from the new Score.
+
+    Parameters
+    ----------
+        ground_truth_df (pd.DataFrame): 
+            The ground truth network dataframe containing columns "Source" and "Target"
+        inferred_network_df (pd.DataFrame): 
+            The inferred network dataframe containing columns "Source", "Target", and "Score"
+        lower_threshold (int, optional): 
+            Can optionally provide a lower threshold value. Defaults to 1 stdev below the ground truth mean.
+        num_edges_for_early_precision (int, optional): 
+            Can optionally provide the number of edges for calculating early precision rate. Defaults to 1000.
+        histogram_save_path (str, optional):
+            Can optionlly provide a save path to create a histogram of the randomized ground truth GRN scores
+            vs. the randomized inferred network scores
+
+    Returns
+    ----------
+        accuracy_metric_dict (dict):
+            A dictionary containing the calculated accuracy metrics. Contains keys:
+            "precision"
+            "recall"
+            "specificity"
+            "accuracy"
+            "f1_score"
+            "jaccard_index"
+            "weighted_jaccard_index"
+            "early_precision_rate"
+        
+        confusion_matrix_dict (dict):
+            A dictionary containing the results of the confution matrix and metrics for AUROC
+            and AUPRC. Contains keys:
+            "true_positive"
+            "true_negative"
+            "false_positive"
+            "false_negative"
+            "y_true"
+            "y_pred"
+            "y_scores"
+    """
+    
+    # Create a copy of the inferred network and ground truth dataframe
+    inferred_network_df_copy = inferred_network_df.copy()
+    ground_truth_df_copy = ground_truth_df.copy()
+    
+    # Extract the Score for each edge
+    inferred_network_score = inferred_network_df_copy["Score"]
+    ground_truth_score = ground_truth_df_copy["Score"]
+    
+    # Combine the scores from the ground truth and inferred network
+    total_scores = pd.concat(
+        [ground_truth_df["Score"], inferred_network_df["Score"]]
+    ).values
+    
+    # Randomly reassign scores back to the ground truth and inferred network
+    resampled_inferred_network_scores = np.random.choice(total_scores, size=len(inferred_network_score), replace=True)
+    resampled_ground_truth_scores = np.random.choice(total_scores, size=len(ground_truth_score), replace=True)
+    
+    # Replace the edge Score in the copied dataframe with the resampled Score
+    inferred_network_df_copy["Score"] = resampled_inferred_network_scores
+    ground_truth_df_copy["Score"] = resampled_ground_truth_scores
+
+    # Calculate the lower threshold of the randomized scores(if not provided)
+    if lower_threshold == None:
+        randomized_ground_truth_mean = ground_truth_df_copy["Score"].mean()
+        randomized_ground_truth_stdev = ground_truth_df_copy["Score"].std()
+        
+        # Default lower threshold is 1 stdev below the ground truth mean
+        lower_threshold = randomized_ground_truth_mean - 1 * randomized_ground_truth_stdev
+    
+    # Recalculate the accuracy metrics for the resampled Score
+    randomized_accuracy_metric_dict, randomized_confusion_matrix_dict = calculate_accuracy_metrics(
+        ground_truth_df_copy,
+        inferred_network_df_copy,
+        lower_threshold,
+        num_edges_for_early_precision
+        )
+    
+    randomized_inferred_dict = {'Randomized': inferred_network_df_copy}
+    randomized_ground_truth_dict = {'Randomized': ground_truth_df_copy}
+    
+    if histogram_save_path != None:
+        print(f'\tSaving histogram of randomized GRN scores')
+        plot_multiple_histogram_with_thresholds(randomized_ground_truth_dict, randomized_inferred_dict, histogram_save_path)
+    
+    return randomized_accuracy_metric_dict, randomized_confusion_matrix_dict
+
+def calculate_and_plot_auroc_auprc(
+    confusion_matrix_score_dict: dict,
+    save_path: str
+    ):
+    """Plots the AUROC and AUPRC"""
+    
+    # Define figure and subplots for combined AUROC and AUPRC plots
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))    
+    
+    for method, score_dict in confusion_matrix_score_dict.items():
+        print(f'\tGenerating AUROC and AUPRC for {method}')
+        y_true = score_dict['y_true']
+        y_scores = score_dict['y_scores']
+        
+        fpr, tpr, _ = roc_curve(y_true, y_scores)
+        precision, recall, _ = precision_recall_curve(y_true, y_scores)
+        roc_auc = auc(fpr, tpr)
+        prc_auc = auc(recall, precision)
+        
+        axes[0].plot(fpr, tpr, label=f'{method} AUROC = {roc_auc:.2f}')
+        axes[0].plot([0, 1], [0, 1], 'k--')  # Diagonal line for random performance
+        
+        axes[1].plot(recall, precision, label=f'{method} AUPRC = {prc_auc:.2f}')
+        
+        
+    axes[0].set_title(f"{method.capitalize()} Combined AUROC")
+    axes[0].set_xlabel("False Positive Rate")
+    axes[0].set_ylabel("True Positive Rate")
+    axes[0].legend(loc="lower right")
+        
+        
+    axes[1].set_title(f"{method.capitalize()} Combined AUPRC")
+    axes[1].set_xlabel("Recall")
+    axes[1].set_ylabel("Precision")
+    axes[1].legend(loc="lower right")
+
+    # Adjust layout and display the figure
+    fig.tight_layout()
+    plt.savefig(save_path, dpi=200)
+    plt.close()
+
+def parse_wall_clock_time(line):
+    # Extract the time part after the last mention of 'time'
+    time_part = line.split("):")[-1].strip()
+    
+    # Split the time part by colons to get hours, minutes, and seconds if present
+    time_parts = time_part.split(":")
+    
+    # Initialize hours, minutes, seconds to 0
+    hours, minutes, seconds = 0, 0, 0
+    
+    # Clean up and parse each part
+    if len(time_parts) == 3:  # h:mm:ss or h:mm:ss.ss
+        hours = float(re.sub(r'[^\d.]', '', time_parts[0]))  # Remove non-numeric characters
+        minutes = float(re.sub(r'[^\d.]', '', time_parts[1]))
+        seconds = float(re.sub(r'[^\d.]', '', time_parts[2]))
+
+    elif len(time_parts) == 2:  # m:ss or m:ss.ss
+        minutes = float(re.sub(r'[^\d.]', '', time_parts[0]))
+        seconds = float(re.sub(r'[^\d.]', '', time_parts[1]))
+
+    # Calculate total time in seconds
+    total_seconds = seconds + (minutes * 60) + (hours * 3600)
+    hours = total_seconds * 0.0002778
+    
+    return hours
+
+def parse_time_module_output(log_dir: str, sample_list: str):
+    sample_resource_dict = {}
+    
+    samples = ["1", "2", "3", "4"]
+    
+    sample_list = [
+        sample_dir for sample_dir in os.listdir(log_dir)
+        if any(rep in sample_dir for rep in samples)
+    ]
+
+    for sample_log_dir in os.listdir(log_dir):
+        print(f'Analyzing {sample_log_dir}')
+        
+        # Find each sample in the LOGS directory
+        if sample_log_dir in sample_list:
+            # Initialize pipeline_step_dict once per sample_log_dir
+            sample_resource_dict[sample_log_dir] = {}
+            
+            # Find each step log file for the sample
+            for file in os.listdir(f'{log_dir}/{sample_log_dir}'):
+                
+                if file.endswith(".log"):
+                    print(file)
+                    pipeline_step = file.split(".")[0]
+                    sample_resource_dict[sample_log_dir][pipeline_step] = {
+                        "user_time": 0,
+                        "system_time": 0,
+                        "percent_cpu": 0,
+                        "wall_clock_time": 0,
+                        "max_ram": 0
+                    }
+
+                    # Extract each relevant resource statistic for the sample step and save it in a dictionary
+                    with open(f'{LOG_DIR}/{sample_log_dir}/{file}', 'r') as log_file:
+                        for line in log_file:
+                            if 'User time' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["user_time"] = float(line.split(":")[-1])
+                            if 'System time' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["system_time"] = float(line.split(":")[-1])
+                            if 'Percent of CPU' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["percent_cpu"] = float(line.split(":")[-1].split("%")[-2])
+                            if 'wall clock' in line:
+                                sample_resource_dict[sample_log_dir][pipeline_step]["wall_clock_time"] = parse_wall_clock_time(line)
+                            if 'Maximum resident set size' in line:
+                                kb_per_gb = 1048576
+                                sample_resource_dict[sample_log_dir][pipeline_step]["max_ram"] = (float(line.split(":")[-1]) / kb_per_gb)
+
+    return sample_resource_dict

@@ -6,6 +6,7 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+import argparse
 
 # Import necessary modules from linger
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
