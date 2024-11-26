@@ -29,3 +29,5 @@ grep
 *.pdf
 *.out
 BASH_LINGER/LOGS/
+BASH_LINGER/grn_analysis_tools/
+BASH_LINGER/helper_functions_old.py

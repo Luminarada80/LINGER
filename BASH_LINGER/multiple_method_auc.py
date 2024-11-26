@@ -9,7 +9,7 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score, ave
 import logging
 import csv
 
-import helper_functions
+from grn_analysis_tools import helper_functions
 
 # Temporarily disable SettingWithCopyWarning
 pd.options.mode.chained_assignment = None
