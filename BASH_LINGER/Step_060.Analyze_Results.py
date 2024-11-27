@@ -25,12 +25,12 @@ rcParams.update({
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-CELL_TYPE = 'macrophage' # H1
+CELL_TYPE = 'mESC' # H1
 
 # ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
 # Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
 CELL_TYPE_TF_DICT: dict = {
-    'macrophage': 'all'
+    'mESC': 'all'
 }
 # ----------------------------------------------------------------
 
@@ -150,6 +150,7 @@ def load_ground_truth():
     """Load ChIP-seq ground truth data."""
     logging.info("Loading ground truth data.")
     ground_truth: pd.DataFrame = pd.read_csv(GROUND_TRUTH_PATH, sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
+    print(ground_truth.head())
     return ground_truth
 
 

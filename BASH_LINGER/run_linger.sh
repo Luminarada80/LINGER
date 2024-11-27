@@ -114,11 +114,9 @@ run_step() {
 #   --celltype "$CELLTYPE" \
 #   --organism "$ORGANISM" 
 
-run_step "Step_060.Analyze_Results" "${SCRIPTS_DIR}/Step_060.Analyze_Results.py" \
-  --result_dir "$SAMPLE_RESULTS_DIR" \
-  --ground_truth "$GROUND_TRUTH_PATH" \
-  --cell_type "$CELLTYPE" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --sample_num "$SAMPLE_NUM"
-
-
+# run_step "Step_060.Analyze_Results" "${SCRIPTS_DIR}/Step_060.Analyze_Results.py" \
+#   --result_dir "$SAMPLE_RESULTS_DIR" \
+#   --ground_truth "$GROUND_TRUTH_PATH" \
+#   --cell_type "$CELLTYPE" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --sample_num "$SAMPLE_NUM"
