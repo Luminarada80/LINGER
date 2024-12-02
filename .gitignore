@@ -28,6 +28,9 @@ grep
 /.idea/*
 *.pdf
 *.out
+*png
 BASH_LINGER/LOGS/
+STATISTICAL_ANALYSIS/INPUT
+STATISTICAL_ANALYSIS/OUTPUT
 BASH_LINGER/grn_analysis_tools/
 BASH_LINGER/helper_functions_old.py
