@@ -8,6 +8,8 @@ import os
 import logging
 import csv
 
+# Install using 'conda install luminarada80::grn_analysis_tools' 
+# or update to the newest version using 'conda update grn_analysis_tools'
 from grn_analysis_tools import grn_formatting, plotting, resource_analysis, grn_stats
 
 # Temporarily disable SettingWithCopyWarning
@@ -314,13 +316,13 @@ def main():
     ground_truth['Source'] = ground_truth['Source'].str.upper().str.strip()
     ground_truth['Target'] = ground_truth['Target'].str.upper().str.strip()
     
-    all_method_stats_dir = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS'
+    all_method_stats_dir = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS/RN204_ground_truth'
     
     path_dict = {
         'linger': {
             "resource_analysis_dir": f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/RESOURCE_ANALYSIS',
             "resource_log_dir": f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS',
-            "statistical_analysis_dir": f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS',
+            "statistical_analysis_dir": f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS/RN204_ground_truth',
         }
     }
     
