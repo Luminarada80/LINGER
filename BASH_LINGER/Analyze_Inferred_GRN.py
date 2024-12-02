@@ -5,11 +5,10 @@ import numpy as np
 import math
 from copy import deepcopy
 import os
-from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score, average_precision_score, precision_recall_curve
 import logging
 import csv
 
-from grn_analysis_tools import helper_functions
+from grn_analysis_tools import grn_formatting, plotting, resource_analysis, grn_stats
 
 # Temporarily disable SettingWithCopyWarning
 pd.options.mode.chained_assignment = None
@@ -74,13 +73,13 @@ def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_g
         linger_threshold = linger_ground_truth_sorted.iloc[num_edges-1]["Score"]
         cell_oracle_threshold = cell_oracle_ground_truth_sorted.iloc[num_edges-1]["Score"]
         
-        linger_summary_dict, linger_accuracy_metrics = helper_functions.calculate_accuracy_metrics(linger_ground_truth, linger_no_ground_truth, linger_threshold, num_edges)
+        linger_summary_dict, linger_accuracy_metrics = grn_stats.calculate_accuracy_metrics(linger_ground_truth, linger_no_ground_truth, linger_threshold, num_edges)
         
         if num_edges not in result_dict['linger']:
             result_dict['linger'][num_edges] = {}
         result_dict['linger'][num_edges] = linger_summary_dict
         
-        cell_oracle_summary_dict, cell_oracle_accuracy_metrics = helper_functions.calculate_accuracy_metrics(oracle_ground_truth, oracle_no_ground_truth, cell_oracle_threshold, num_edges)
+        cell_oracle_summary_dict, cell_oracle_accuracy_metrics = grn_stats.calculate_accuracy_metrics(oracle_ground_truth, oracle_no_ground_truth, cell_oracle_threshold, num_edges)
                 
         if num_edges not in result_dict['cell_oracle']:
             result_dict['cell_oracle'][num_edges] = {}
@@ -169,69 +168,174 @@ def calculate_edge_cutoff_accuracy_metrics(ground_truth_with_scores, linger_no_g
 
 
     plt.savefig(f'{top_edge_accuracy_outdir}/linger_vs_cell_oracle_comparison.png', dpi=200)
+
+def plot_resources_by_step(resource_dict: dict, output_dir: str):
+    # Plot the resource requirements by step for each sample
+    plotting.plot_metric_by_step_adjusted(
+        sample_resource_dict=resource_dict,
+        metric='user_time',
+        ylabel='User Time (h) / Percent CPU Usage',
+        title='User Time / Percent CPU Usage by Step for Each Sample',
+        filename=f'{output_dir}/Step_User_Time_Summary.png',
+        divide_by_cpu=True
+    )
+
+    plotting.plot_metric_by_step_adjusted(
+        sample_resource_dict=resource_dict,
+        metric='system_time',
+        ylabel='System Time (h) / Percent CPU Usage',
+        title='System Time / Percent CPU Usage by Step for Each Sample',
+        filename=f'{output_dir}/Step_System_Time.png',
+        divide_by_cpu=True
+    )
+
+    plotting.plot_metric_by_step_adjusted(
+        sample_resource_dict=resource_dict,
+        metric='wall_clock_time',
+        ylabel='Wall Clock Time (h)',
+        title='Wall Clock Time by Step for Each Sample',
+        filename=f'{output_dir}/Step_Wall_Clock_Time.png',
+        divide_by_cpu=False
+    )
+
+    plotting.plot_metric_by_step_adjusted(
+        sample_resource_dict=resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage by Step for Each Sample',
+        filename=f'{output_dir}/Step_Max_Ram.png',
+        divide_by_cpu=False
+    )
+
+    plotting.plot_metric_by_step_adjusted(
+        sample_resource_dict=resource_dict,
+        metric='percent_cpu',
+        ylabel='Percent CPU',
+        title='Percent of the CPU Used',
+        filename=f'{output_dir}/Step_Percent_Cpu.png',
+        divide_by_cpu=False
+    )
+
+def plot_resources_by_sample(resource_dict: dict, output_dir: str):
+    # Plot the resource requirements for running the entire pipeline
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='user_time',
+        ylabel='Total User Time / Percent CPU Usage',
+        title='Total User Time / Percent CPU Usage for Each Sample',
+        filename=f'{output_dir}/Total_User_Time.png',
+        divide_by_cpu=True
+    )
+
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='system_time',
+        ylabel='Total System Time / Percent CPU Usage',
+        title='Total System Time / Percent CPU Usage for Each Sample',
+        filename=f'{output_dir}/Total_System_Time.png',
+        divide_by_cpu=True
+    )
+
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='wall_clock_time',
+        ylabel='Wall Clock Time (h)',
+        title='Total Wall Clock Time',
+        filename=f'{output_dir}/Total_Wall_Clock_Time.png',
+        divide_by_cpu=False
+    )
+
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage',
+        filename=f'{output_dir}/Total_Max_Ram.png',
+        divide_by_cpu=False
+    )
+
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='max_ram',
+        ylabel='Max RAM Usage (GB)',
+        title='Max RAM usage',
+        filename=f'{output_dir}/Total_Max_Ram.png',
+        divide_by_cpu=False
+    )
+
+    plotting.plot_total_metric_by_sample(
+        sample_resource_dict=resource_dict,
+        metric='percent_cpu',
+        ylabel='Percent CPU',
+        title='Average Percent of the CPU Used',
+        filename=f'{output_dir}/Total_Percent_Cpu.png',
+        divide_by_cpu=False
+    )
+
+def create_resource_requirement_summary(resource_dict: dict, output_dir: str):
+    summary_dict = {}
+
+    for sample, step_dict in resource_dict.items():
+        if sample not in summary_dict:
+            summary_dict[sample] = {
+                    "user_time": 0,
+                    "system_time": 0,
+                    "percent_cpu": [],
+                    "wall_clock_time": 0,
+                    "max_ram": []
+                }
+        for step, sample_resource_dict in step_dict.items():
+            for resource_name, resource_value in sample_resource_dict.items():
+                if resource_name == "percent_cpu":
+                    summary_dict[sample][resource_name].append(round(resource_value,2))
+                elif resource_name == "max_ram":
+                    summary_dict[sample][resource_name].append(round(resource_value,2))
+                else:
+                    summary_dict[sample][resource_name] += round(resource_value,2)
+        summary_dict[sample]["max_ram"] = max(summary_dict[sample]["max_ram"])
+        summary_dict[sample]["percent_cpu"] = round(sum(summary_dict[sample]["percent_cpu"]) / len(summary_dict[sample]["percent_cpu"]),2)
         
+    summary_df = pd.DataFrame(summary_dict)
+    summary_df = summary_df.reindex(sorted(summary_df.columns), axis=1)
+    print(summary_df.head())
+
+    summary_df.to_csv(f'{output_dir}/Resource_Summary.tsv', sep='\t')
     
 def main():
     samples = [
-        "1000_cells_E7.5_rep1",
-        "1000_cells_E7.5_rep2",
-        "1000_cells_E7.75_rep1",
-        "1000_cells_E8.0_rep1",
-        "1000_cells_E8.0_rep2",
-        "2000_cells_E7.5_rep1",
-        "2000_cells_E8.0_rep1",
-        "2000_cells_E8.0_rep2",
-        "3000_cells_E7.5_rep1",
-        "3000_cells_E8.0_rep1",
-        "3000_cells_E8.0_rep2",
-        "4000_cells_E7.5_rep1",
-        "4000_cells_E8.0_rep1",
-        "4000_cells_E8.0_rep2",
-        "5000_cells_E7.5_rep1",
-        "filtered_L2_E7.5_rep1",
-        "filtered_L2_E7.5_rep2",
-        "filtered_L2_E7.75_rep1",
-        "filtered_L2_E8.0_rep1",
-        "filtered_L2_E8.0_rep2",
+        "1",
+        "2",
+        "3",
+        "4",
     ]
     
+    ground_truth_path = f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MACROPHAGE/RN204_macrophage_ground_truth.tsv'
+    ground_truth = pd.read_csv(ground_truth_path, sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
+    ground_truth['Source'] = ground_truth['Source'].str.upper().str.strip()
+    ground_truth['Target'] = ground_truth['Target'].str.upper().str.strip()
+    
+    all_method_stats_dir = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS'
+    
+    path_dict = {
+        'linger': {
+            "resource_analysis_dir": f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/RESOURCE_ANALYSIS',
+            "resource_log_dir": f'/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS',
+            "statistical_analysis_dir": f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/STATISTICAL_ANALYSIS',
+        }
+    }
+    
     total_accuracy_metrics: dict = {}
-    random_accuracy_metrics: dict = {}
+    random_accuracy_metrics: dict = {}   
     
     # Iterate through each sample in the list of sample names / numbers
+    logging.info(f'\n----- Inferred Networks vs Ground Truth Statistical Analysis -----')
     for i, sample in enumerate(samples):
         logging.info(f'Processing sample {sample} ({i+1}/{len(samples)})')
-
-        # Load the datasets
-        # cell_oracle_network = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/Celloracle/DS_014_mESC/Inferred_GRN/5000cells_E7.5_rep1_final_GRN.csv')
-        linger_network = pd.read_csv(f'/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_TRAINED_MODEL/{sample}/cell_type_specific_trans_regulatory_mESC.txt', sep='\t', index_col=0, header=0)
-        ground_truth = pd.read_csv('/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/RN112_LOGOF.tsv', sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
         
-        result_dir = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MESC_RESULTS/STATISTICAL_ANALYSIS/{sample}'
-        total_accuracy_metrics_dir = f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MESC_RESULTS/STATISTICAL_ANALYSIS'
-        
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-
-        # Make sure the gene names are capitalized for the ground truth
-        ground_truth['Source'] = ground_truth['Source'].str.upper().str.strip()
-        ground_truth['Target'] = ground_truth['Target'].str.upper().str.strip()
-        
-        # Standardize the format of the two inferred networks and capitalize gene names
-        logging.debug('Standardizing the format of the network dataframes')
-        
-        linger_df = helper_functions.create_standard_dataframe(linger_network)
+        # Load the datasets for the sample
+        linger_network = pd.read_csv(f'/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS/LINGER_TRAINED_MODELS/{sample}/cell_type_specific_trans_regulatory_macrophage.txt', sep='\t', index_col=0, header=0)
+        linger_df = grn_formatting.create_standard_dataframe(linger_network)
         logging.debug(f'Inferred Net: {len(set(linger_df["Source"])):,} TFs, {len(set(linger_df["Target"])):,} TGs, and {len(linger_df["Source"]):,} edges\n')
-
-        
-        # Write out the network size for the ground truth
-        with open(f'{result_dir}/summary_statistics.txt', 'w') as summary_stat_file:
-            summary_stat_file.write(f'Dataset\tTFs\tTGs\tEdges\n')
-            summary_stat_file.write(f'Ground_truth\t{len(set(ground_truth["Source"]))}\t{len(set(ground_truth["Target"]))}\t{len(ground_truth["Source"])}\n')
-            
-        logging.debug(f'Ground truth: {len(set(ground_truth["Source"])):,} TFs, {len(set(ground_truth["Target"])):,} TGs, and {len(ground_truth["Source"]):,} edges\n')
-
-        # oracle_df = helper_functions.create_standard_dataframe(cell_oracle_network, score_col="coef_mean")
         
         inferred_network_dict: dict = {
             'linger': linger_df,
@@ -242,10 +346,24 @@ def main():
             
         confusion_matrix_dict_all_methods: dict = {}
         
-        
         # Process the ground truth and inferred networks
         logging.debug('\n----- Processing inferred networks and ground truths -----')
         for method, inferred_network_df in inferred_network_dict.items():
+            
+            sample_result_dir = f'{path_dict[method]["statistical_analysis_dir"]}/{sample}'
+                
+            if not os.path.exists(sample_result_dir):
+                os.makedirs(sample_result_dir)
+            
+            # Write out the network size for the ground truth
+            with open(f'{sample_result_dir}/summary_statistics.txt', 'w') as summary_stat_file:
+                summary_stat_file.write(f'Dataset\tTFs\tTGs\tEdges\n')
+                summary_stat_file.write(f'Ground_truth\t{len(set(ground_truth["Source"]))}\t{len(set(ground_truth["Target"]))}\t{len(ground_truth["Source"])}\n')
+                
+            logging.debug(f'Ground truth: {len(set(ground_truth["Source"])):,} TFs, {len(set(ground_truth["Target"])):,} TGs, and {len(ground_truth["Source"]):,} edges\n')
+            
+            
+            # Add the method and samples to the total and random accuracy metrics dictionary
             if method not in total_accuracy_metrics:
                 total_accuracy_metrics[method] = {
                     'sample_name': [],
@@ -279,9 +397,8 @@ def main():
             total_accuracy_metrics[method]['sample_name'].append(sample)
             random_accuracy_metrics[method]['sample_name'].append(sample)
             
-            
             # Append the inferred network information to the summary stats file
-            with open(f'{result_dir}/summary_statistics.txt', 'a') as summary_stat_file:
+            with open(f'{sample_result_dir}/summary_statistics.txt', 'a') as summary_stat_file:
                 summary_stat_file.write(f'{method.capitalize()}\t{len(set(inferred_network_df["Source"]))}\t{len(set(inferred_network_df["Target"]))}\t{len(inferred_network_df["Source"])}\n')
             
             ground_truth_dict[method] = deepcopy(ground_truth)
@@ -289,7 +406,7 @@ def main():
             method_ground_truth = ground_truth_dict[method]
             
             logging.debug(f'\tAdding inferred scores to the ground truth edges for {method}')
-            method_ground_truth = helper_functions.add_inferred_scores_to_ground_truth(method_ground_truth, inferred_network_df)
+            method_ground_truth = grn_formatting.add_inferred_scores_to_ground_truth(method_ground_truth, inferred_network_df)
             
             # Drop any NaN scores in the ground truth after adding scores
             method_ground_truth = method_ground_truth.dropna(subset=['Score'])
@@ -300,25 +417,30 @@ def main():
             
             # Remove any TFs and TGs from the inferred network that are not in the ground truth network
             logging.debug(f'\tRemoving TFs and TGs from inferred network that are not in ground truth for {method}')
-            inferred_network_only_shared_tf_tg_df = helper_functions.remove_tf_tg_not_in_ground_truth(method_ground_truth, inferred_network_df)
+            inferred_network_only_shared_tf_tg_df = grn_formatting.remove_tf_tg_not_in_ground_truth(method_ground_truth, inferred_network_df)
             logging.debug(f"\t\tGround truth shape: TFs = {len(set(method_ground_truth['Source']))}, TGs = {len(set(method_ground_truth['Target']))}, edges = {len(set(method_ground_truth['Score']))}")
             logging.debug(f"\t\tInferred same genes: TFs = {len(set(inferred_network_only_shared_tf_tg_df['Source']))}, TGs = {len(set(inferred_network_only_shared_tf_tg_df['Target']))}, edges = {len(set(inferred_network_only_shared_tf_tg_df['Score']))}")
             
-
             # Remove ground truth edges from the inferred network
-            inferred_network_no_ground_truth_df = helper_functions.remove_ground_truth_edges_from_inferred(method_ground_truth, inferred_network_only_shared_tf_tg_df)
+            inferred_network_no_ground_truth_df = grn_formatting.remove_ground_truth_edges_from_inferred(method_ground_truth, inferred_network_only_shared_tf_tg_df)
             logging.debug(f"\t\tInferred no ground truth: TFs = {len(set(inferred_network_no_ground_truth_df['Source']))}, TGs = {len(set(inferred_network_no_ground_truth_df['Target']))}, edges = {len(set(inferred_network_no_ground_truth_df['Score']))}")
             
             # Drop any NaN scores in the inferred network after adding scores
             inferred_network_no_ground_truth_df = inferred_network_no_ground_truth_df.dropna(subset=['Score'])
             
+            # Classify the true and predicted interactions for the ground truth and inferred networks
+            logging.debug(f'\t\tClassifying true and predicted interactions for the ground truth and inferred networks')
+            method_ground_truth, inferred_network_no_ground_truth_df = grn_stats.classify_interactions_by_threshold(method_ground_truth, inferred_network_no_ground_truth_df)
+            
             logging.debug(f'\n----- Calculating accuracy metrics for {method} -----')
             # Calculate the accuracy metrics and the confusion matrix (TP, FP, TN, FN)
-            accuracy_metric_dict, confusion_matrix_score_dict = helper_functions.calculate_accuracy_metrics(method_ground_truth, inferred_network_no_ground_truth_df)        
+            accuracy_metric_dict, confusion_matrix_score_dict = grn_stats.calculate_accuracy_metrics(method_ground_truth, inferred_network_no_ground_truth_df)
+            confusion_matrix_dict_all_methods[method] = confusion_matrix_score_dict        
             
+            # Calculate the accuracy metrics and confusion matrix when the edge scores for the ground truth and inferred networks are randomized
             logging.debug(f'\tCalculating randomized accuracy metrics for {method}')
-            randomized_histogram_path = f'{result_dir}/Histogram_Randomized_GRN_Scores'
-            randomized_accuracy_metric_dict, randomized_confusion_matrix_dict = helper_functions.create_randomized_inference_scores(
+            randomized_histogram_path = f'{sample_result_dir}/Histogram_Randomized_GRN_Scores'
+            randomized_accuracy_metric_dict, randomized_confusion_matrix_dict = grn_stats.create_randomized_inference_scores(
                 method_ground_truth,
                 inferred_network_no_ground_truth_df,
                 histogram_save_path=randomized_histogram_path
@@ -330,71 +452,83 @@ def main():
                 f"{method} Randomized": randomized_confusion_matrix_dict
             }
             
+            # Calculate the AUROC and AUPRC for the randomized edge scores
+            randomized_auroc = grn_stats.calculate_auroc(randomized_confusion_matrix_dict)
+            randomized_auprc = grn_stats.calculate_auprc(randomized_confusion_matrix_dict)
             
+            random_accuracy_metrics[method]["auroc"].append(randomized_auroc)
+            random_accuracy_metrics[method]["auprc"].append(randomized_auprc)
             
             # Calculate the AUROC and AUPRC for the randomized and original edge scores
             logging.debug(f'\tGenerating AUROC and AUPRC comparing the randomized scores to the original scores')
-            
-            randomized_auc_path = f'{result_dir}/{method}_randomized_auroc_auprc.png'
-            auc_dict = helper_functions.calculate_and_plot_auroc_auprc(randomized_method_dict, randomized_auc_path)
-            
-            random_accuracy_metrics[method]["auroc"].append(auc_dict[f"{method} Randomized"]["auroc"])
-            random_accuracy_metrics[method]["auprc"].append(auc_dict[f"{method} Randomized"]["auprc"])
+            randomized_auc_path = f'{sample_result_dir}/{method}_randomized_auroc_auprc.png'
+            plotting.plot_auroc_auprc(randomized_method_dict, randomized_auc_path)
             
             logging.debug(f'\n----- Accuracy Metrics -----')
             logging.debug(f'\tSaving accuracy metrics for {method}')
-            with open(f'{result_dir}/accuracy_metrics.tsv', 'w') as accuracy_metric_file:
+            with open(f'{sample_result_dir}/accuracy_metrics.tsv', 'w') as accuracy_metric_file:
                 accuracy_metric_file.write(f'Metric\tScore\n')
                 for metric_name, score in accuracy_metric_dict.items():
                     accuracy_metric_file.write(f'{metric_name}\t{score:.4f}\n')
                     total_accuracy_metrics[method][metric_name].append(score)
             
             logging.debug(f'\tSaving randomized score accuracy methods for {method}')
-            with open(f'{result_dir}/randomized_accuracy_method.tsv', 'w') as random_accuracy_file:
+            with open(f'{sample_result_dir}/randomized_accuracy_method.tsv', 'w') as random_accuracy_file:
                 random_accuracy_file.write(f'Metric\tOriginal Score\tRandomized Score\n')
                 for metric_name, score in accuracy_metric_dict.items():
                     random_accuracy_file.write(f'{metric_name}\t{score:.4f}\t{randomized_accuracy_metric_dict[metric_name]:4f}\n')
                     random_accuracy_metrics[method][metric_name].append(randomized_accuracy_metric_dict[metric_name])
-                    
-            
-            logging.debug(f"\n\tTrue Positives: {confusion_matrix_score_dict['true_positive']:,}")
-            logging.debug(f"\tTrue Negatives: {confusion_matrix_score_dict['true_negative']:,}")
-            logging.debug(f"\tFalse Positives: {confusion_matrix_score_dict['false_positive']:,}")
-            logging.debug(f"\tFalse Negatives: {confusion_matrix_score_dict['false_negative']:,}")
-            
-            confusion_matrix_dict_all_methods[method] = confusion_matrix_score_dict
             
             ground_truth_dict[method] = method_ground_truth
             inferred_network_dict[method] = inferred_network_no_ground_truth_df
         
         logging.debug(f'\n ----- Generating Summary Plots -----')
         logging.debug(f'\tSaving histogram of ground truth vs inferred GRN scores with threshold')
-        histogram_path = f"{result_dir}/Histogram_GRN_Scores_With_Threshold"
-        helper_functions.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_network_dict, histogram_path)
+        histogram_path = f"{sample_result_dir}/Histogram_GRN_Scores_With_Threshold"
+        plotting.plot_multiple_histogram_with_thresholds(ground_truth_dict, inferred_network_dict, histogram_path)
         
         logging.debug(f'\tSaving combined AUROC and AUPRC graph')
-        auc_path = f'{result_dir}/auroc_auprc.png'
-        auc_dict = helper_functions.calculate_and_plot_auroc_auprc(confusion_matrix_dict_all_methods, auc_path)
+        
+        # Calculate the AUROC and AUPRC
+        auroc = grn_stats.calculate_auroc(confusion_matrix_score_dict)
+        auprc = grn_stats.calculate_auprc(confusion_matrix_score_dict)
+        
+        # Plot the AUROC and AUPRC
+        auc_path = f'{sample_result_dir}/auroc_auprc.png'
+        plotting.plot_auroc_auprc(confusion_matrix_dict_all_methods, auc_path)
 
-        total_accuracy_metrics[method]['auroc'].append(auc_dict[method]['auroc'])
-        total_accuracy_metrics[method]['auprc'].append(auc_dict[method]['auprc'])
+        total_accuracy_metrics[method]['auroc'].append(auroc)
+        total_accuracy_metrics[method]['auprc'].append(auprc)
     
     # Create a dataframe of the total accuracy metrics by each sample for each inference method
+    logging.info(f'\n----- Saving Accuracy Metrics for All Samples -----')
     for method in inferred_network_dict.keys():
         total_accuracy_metrics_df = pd.DataFrame(total_accuracy_metrics[method]).T
         random_accuracy_metrics_df = pd.DataFrame(random_accuracy_metrics[method]).T
-        
-        logging.debug(total_accuracy_metrics_df.head())
-        logging.debug(random_accuracy_metrics_df.head())
-        total_accuracy_metrics_df.to_csv(f'{total_accuracy_metrics_dir}/total_accuracy_metrics.tsv', sep='\t')
-        random_accuracy_metrics_df.to_csv(f'{total_accuracy_metrics_dir}/random_accuracy_metrics.tsv', sep='\t')
+
+        total_accuracy_metrics_df.to_csv(f'{all_method_stats_dir}/total_accuracy_metrics.tsv', sep='\t')
+        random_accuracy_metrics_df.to_csv(f'{all_method_stats_dir}/random_accuracy_metrics.tsv', sep='\t')
     
-    logging.info(f'\nDone! Outfiles written to {result_dir}')
+    logging.info(f'\nDone! Results written to {all_method_stats_dir}')
+    
+    logging.info(f'\n----- Resource Analysis -----')
+    for method in path_dict:
+        logging.info(f'\tAnalysing resource requirements for {method}')
+        log_dir = path_dict[method]["resource_log_dir"]
+        output_dir = path_dict[method]["resource_analysis_dir"]
+        
+        resource_dict = resource_analysis.parse_time_module_output(log_dir, samples)
+        
+        plot_resources_by_step(resource_dict, output_dir)
+        plot_resources_by_sample(resource_dict, output_dir)
+        create_resource_requirement_summary(resource_dict, output_dir) 
+    
+        logging.info(f'\nDone! Results written to {output_dir}')
 
 if __name__ == '__main__':
     
     # Configure logging
-    logging.basicConfig(level=logging.INFO, format='%(message)s')   
+    logging.basicConfig(level=logging.DEBUG, format='%(message)s')   
     
     main()
     
