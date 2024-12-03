@@ -353,7 +353,8 @@ def preprocess_inferred_and_ground_truth_networks(ground_truth_path, method_name
                 processed_ground_truth_dict[method] = {}
             processed_ground_truth_dict[method][sample] = sample_ground_truth
     
-    return processed_ground_truth_dict, processed_inferred_network_dic
+    return processed_ground_truth_dict, processed_inferred_network_dict
+
 
 def main():
     print(f'Reading input files')
