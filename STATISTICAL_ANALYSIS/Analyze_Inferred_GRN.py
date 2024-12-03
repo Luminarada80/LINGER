@@ -414,8 +414,10 @@ def main():
             # Plot the normal and randomized AUROC and AUPRC for the individual sample
             confusion_matrix_with_method = {method: confusion_matrix_score_dict}
             randomized_confusion_matrix_with_method = {method: randomized_confusion_matrix_dict}
+            
+            print(f'\t\tPlotting AUROC and AUPRC for normal and randomized methods')
             plotting.plot_auroc_auprc(confusion_matrix_with_method, f'./OUTPUT/{method}/{sample}/auroc_auprc.png')
-            plotting.plot_auroc_auprc(randomized_confusion_matrix_with_method, f'./OUTPUT/{method}/{sample}/randomized_auroc_auprc.png')
+            # plotting.plot_auroc_auprc(randomized_confusion_matrix_with_method, f'./OUTPUT/{method}/{sample}/randomized_auroc_auprc.png')
             
             # Record the y_true and y_scores for the current sample to plot all sample AUROC and AUPRC between methods
             total_method_confusion_scores[method]['y_true'].append(confusion_matrix_score_dict['y_true'])
@@ -427,6 +429,14 @@ def main():
             
             randomized_method_dict[f"{method} Randomized"]['y_true'].append(randomized_confusion_matrix_dict['y_true'])
             randomized_method_dict[f"{method} Randomized"]['y_scores'].append(randomized_confusion_matrix_dict['y_scores'])
+            
+            
+            sample_randomized_method_dict = {
+                f"{method} Original": {'y_true':confusion_matrix_score_dict['y_true'], 'y_scores':confusion_matrix_score_dict['y_scores']},
+                f"{method} Randomized": {'y_true':randomized_confusion_matrix_dict['y_true'], 'y_scores':randomized_confusion_matrix_dict['y_scores']}
+            }
+            
+            plotting.plot_auroc_auprc(sample_randomized_method_dict, f'./OUTPUT/{method}/{sample}/randomized_auroc_auprc.png')
             
             
             print(f'\tAppending accuracy metrics to total accuracy metric dict')
@@ -446,21 +456,15 @@ def main():
             random_accuracy_metrics[method][sample]['false_positive'] = int(randomized_confusion_matrix_dict["false_positive"])
             random_accuracy_metrics[method][sample]['false_negative'] = int(randomized_confusion_matrix_dict["false_negative"])
         
+        print(f'\tPlotting {method.lower()} original vs randomized AUROC and AUPRC for all samples')
         plotting.plot_multiple_method_auroc_auprc(randomized_method_dict, f'./OUTPUT/{method.lower()}_randomized_auroc_auprc.png')
     
+    print(f'\nPlotting AUROC and AUPRC comparing all methods')
     plotting.plot_multiple_method_auroc_auprc(total_method_confusion_scores, './OUTPUT/auroc_auprc_combined.png')
+    
     
     write_method_accuracy_metric_file(total_accuracy_metrics)
     write_method_accuracy_metric_file(random_accuracy_metrics)
-    
-
-    
-    for method, sample_dict in total_accuracy_metrics.items():
-        print(method)
-        for sample_name, accuracy_metric_dict in sample_dict.items():
-            print(f'\t{sample_name}')
-            for accuracy_metric, score in accuracy_metric_dict.items():
-                print(f'\t\t{accuracy_metric} = {score:.2f}')
                 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(message)s')  
