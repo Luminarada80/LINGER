@@ -275,6 +275,7 @@ def read_input_files() -> tuple[str, list, list, dict]:
     
     return ground_truth_path, method_names, sample_names, inferred_network_dict
 
+<<<<<<< HEAD
 def load_inferred_network_df(
     inferred_network_file: str,
     separator: str
@@ -294,6 +295,10 @@ def load_inferred_network_df(
 def standardize_ground_truth_format(ground_truth_df: pd.DataFrame) -> pd.DataFrame:
     """
     Changes Source and Target gene names to uppercase and removes any whitespace
+=======
+def load_inferred_network_df(inferred_network_file, separator):
+    return pd.read_csv(inferred_network_file, sep=separator, index_col=0, header=0)
+>>>>>>> 59a2878 (Updated the code to run for multiple methods, currently tested on LINGER and CellOracle. I might need to adjust for more than 2 methods, but it should be fairly robust. Requires a file structure where there is an INPUT file in the same directory as the script containing folders named as each sample name, containing the inferred network for that sample. The ground truth file needs to be in INPUT/GROUND_TRUTH)
 
     Parameters
     ----------
@@ -349,6 +354,7 @@ def create_ground_truth_copies(
     
     return ground_truth_dict
 
+<<<<<<< HEAD
 def write_method_accuracy_metric_file(total_accuracy_metric_dict: dict) -> None:
     """
     For each inference method, creates a pandas dataframe of the accuracy metrics for each sample and 
@@ -362,10 +368,14 @@ def write_method_accuracy_metric_file(total_accuracy_metric_dict: dict) -> None:
             A dictionary containing the method names, sample names, accuracy metric names, and accuracy 
             metric values.
     """
+=======
+def write_method_accuracy_metric_file(total_accuracy_metric_dict):
+>>>>>>> 59a2878 (Updated the code to run for multiple methods, currently tested on LINGER and CellOracle. I might need to adjust for more than 2 methods, but it should be fairly robust. Requires a file structure where there is an INPUT file in the same directory as the script containing folders named as each sample name, containing the inferred network for that sample. The ground truth file needs to be in INPUT/GROUND_TRUTH)
     for method in total_accuracy_metric_dict.keys():
         total_accuracy_metrics_df = pd.DataFrame(total_accuracy_metric_dict[method]).T
         total_accuracy_metrics_df.to_csv(f'OUTPUT/{method.lower()}_total_accuracy_metrics.tsv', sep='\t')
 
+<<<<<<< HEAD
 def update_metrics(
     confusion_score_dict: dict,
     randomized_dict: dict,
@@ -609,12 +619,18 @@ def preprocess_inferred_and_ground_truth_networks(ground_truth_path, method_name
             `processed_inferred_network_dict[method][sample] = processed_inferred_network_df`
     """
     print(f'\tReading ground truth')
+=======
+def preprocess_inferred_and_ground_truth_networks(ground_truth_path, method_names, sample_names, inferred_network_dict):
+    # Read in and standardize the ground truth dataframe
+    print(f'Reading ground truth')
+>>>>>>> 59a2878 (Updated the code to run for multiple methods, currently tested on LINGER and CellOracle. I might need to adjust for more than 2 methods, but it should be fairly robust. Requires a file structure where there is an INPUT file in the same directory as the script containing folders named as each sample name, containing the inferred network for that sample. The ground truth file needs to be in INPUT/GROUND_TRUTH)
     ground_truth = pd.read_csv(ground_truth_path, sep='\t', quoting=csv.QUOTE_NONE, on_bad_lines='skip', header=0)
     ground_truth = standardize_ground_truth_format(ground_truth)
     ground_truth_dict = create_ground_truth_copies(ground_truth, method_names, sample_names, inferred_network_dict)
     
     processed_inferred_network_dict: dict = {}
     processed_ground_truth_dict: dict = {}
+<<<<<<< HEAD
 
     # Initial setup: Load and standardize inferred network dataframes
     inferred_networks = {}
@@ -790,6 +806,169 @@ def main():
     
     print(f'Done! Successfully completed analysis')
 
+=======
+    
+    # Format and process the ground truth and inferred networks for each sample in each method
+    for method in method_names:
+        print(f'\nProcessing {method}')
+        method_samples = [sample for sample in sample_names if sample in inferred_network_dict[method]]
+        for sample in method_samples:
+            print(f'\n\tProcessing {sample}')
+            sample_ground_truth = ground_truth_dict[method][sample]
+            inferred_network_file = inferred_network_dict[method][sample]
+            
+            if method == 'CELL_ORACLE':
+                sep = ','
+            else:
+                sep = '\t'
+            
+            print(f'\t\tLoading inferred network df')
+            inferred_network_df = load_inferred_network_df(inferred_network_file, sep)
+            
+            print(f'\t\tStandardizing dataframe format')
+            if method == "CELL_ORACLE":
+                inferred_network_df = grn_formatting.create_standard_dataframe(inferred_network_df, source_col='source', target_col='target', score_col='coef_abs')
+            else:
+                inferred_network_df = grn_formatting.create_standard_dataframe(inferred_network_df, source_col='Source', target_col='Target', score_col='Score')
+
+            print(f'\t\tAdding inferred scores to ground truth')
+            sample_ground_truth = grn_formatting.add_inferred_scores_to_ground_truth(sample_ground_truth, inferred_network_df)
+            
+            print(f'\t\tSetting scores to log2')
+            inferred_network_df["Score"] = np.log2(inferred_network_df["Score"])
+            sample_ground_truth["Score"] = np.log2(sample_ground_truth["Score"])
+            
+            print(f'\t\tRemoving genes from inferred not in ground truth')
+            inferred_network_df = grn_formatting.remove_tf_tg_not_in_ground_truth(sample_ground_truth, inferred_network_df)
+            
+            print(f'\t\tRemoving ground truth edges from inferred')
+            inferred_network_df = grn_formatting.remove_ground_truth_edges_from_inferred(sample_ground_truth, inferred_network_df)
+            
+            print(f'\t\tRemoving NaN values from the inferred network')
+            inferred_network_df = inferred_network_df.dropna(subset=['Score'])
+            sample_ground_truth = sample_ground_truth.dropna(subset=['Score']) 
+            
+            print(f'\t\tClassifying interactions by ground truth threshold')
+            sample_ground_truth, inferred_network_df = grn_stats.classify_interactions_by_threshold(sample_ground_truth, inferred_network_df)
+            
+            print(f'\t\tAdding the processed inferred network to the processed inferred network dict')
+            if method not in processed_inferred_network_dict:
+                processed_inferred_network_dict[method] = {}
+            processed_inferred_network_dict[method][sample] = inferred_network_df
+            
+            print(f'\t\tAdding the processed ground truth dict to the processed ground truth dict')
+            if method not in processed_ground_truth_dict:
+                processed_ground_truth_dict[method] = {}
+            processed_ground_truth_dict[method][sample] = sample_ground_truth
+    
+    return processed_ground_truth_dict, processed_inferred_network_dic
+
+def main():
+    print(f'Reading input files')
+    ground_truth_path, method_names, sample_names, inferred_network_dict = read_input_files()
+    
+    print(f'Preprocessing inferred and ground truth networks')
+    processed_ground_truth_dict, processed_inferred_network_dict = preprocess_inferred_and_ground_truth_networks(ground_truth_path, method_names, sample_names, inferred_network_dict)
+    
+    total_method_confusion_scores = {}
+    total_accuracy_metrics = {}
+    random_accuracy_metrics = {}
+    for method, sample_dict in processed_inferred_network_dict.items():
+        print(method)
+        total_method_confusion_scores[method] = {'y_true':[], 'y_scores':[]}
+        randomized_method_dict = {
+                f"{method} Original": {'y_true':[], 'y_scores':[]},
+                f"{method} Randomized": {'y_true':[], 'y_scores':[]}
+            }
+        total_accuracy_metrics[method] = {}
+        random_accuracy_metrics[method] = {}
+        for sample in sample_dict:
+            print(f'\t{sample}')
+            
+            total_accuracy_metrics[method][sample] = {}
+            random_accuracy_metrics[method][sample] = {}
+
+            processed_ground_truth_df = processed_ground_truth_dict[method][sample]
+            processed_inferred_network_df = processed_inferred_network_dict[method][sample]
+    
+            accuracy_metric_dict, confusion_matrix_score_dict = grn_stats.calculate_accuracy_metrics(processed_ground_truth_df, processed_inferred_network_df)
+            randomized_accuracy_metric_dict, randomized_confusion_matrix_dict = grn_stats.create_randomized_inference_scores(processed_ground_truth_df, processed_inferred_network_df)
+
+            # Write out the accuracy metrics to a tsv file
+            with open(f'./OUTPUT/{method.upper()}/{sample.upper()}/accuracy_metrics.tsv', 'w') as accuracy_metric_file:
+                accuracy_metric_file.write(f'Metric\tScore\n')
+                for metric_name, score in accuracy_metric_dict.items():
+                    accuracy_metric_file.write(f'{metric_name}\t{score:.4f}\n')
+                    total_accuracy_metrics[method][sample][metric_name] = score
+            
+            # Write out the randomized accuracy metrics to a tsv file
+            with open(f'./OUTPUT/{method.upper()}/{sample.upper()}/randomized_accuracy_method.tsv', 'w') as random_accuracy_file:
+                random_accuracy_file.write(f'Metric\tOriginal Score\tRandomized Score\n')
+                for metric_name, score in accuracy_metric_dict.items():
+                    random_accuracy_file.write(f'{metric_name}\t{score:.4f}\t{randomized_accuracy_metric_dict[metric_name]:4f}\n')
+                    random_accuracy_metrics[method][sample][metric_name] = randomized_accuracy_metric_dict[metric_name]
+            
+            # Calculate the AUROC and randomized AUROC
+            auroc = grn_stats.calculate_auroc(confusion_matrix_score_dict)
+            randomized_auroc = grn_stats.calculate_auroc(randomized_confusion_matrix_dict)
+            print(f'\t\tAUROC = {auroc:.2f} (randomized = {randomized_auroc:.2f})')
+            
+            # Calculate the AUPRC and randomized AUPRC
+            auprc = grn_stats.calculate_auprc(confusion_matrix_score_dict)
+            randomized_auprc = grn_stats.calculate_auprc(randomized_confusion_matrix_dict)
+            print(f'\t\tAUPRC = {auprc:.2f} (randomized = {randomized_auroc:.2f})')
+            
+            # Plot the normal and randomized AUROC and AUPRC for the individual sample
+            confusion_matrix_with_method = {method: confusion_matrix_score_dict}
+            randomized_confusion_matrix_with_method = {method: randomized_confusion_matrix_dict}
+            plotting.plot_auroc_auprc(confusion_matrix_with_method, f'./OUTPUT/{method}/{sample}/auroc_auprc.png')
+            plotting.plot_auroc_auprc(randomized_confusion_matrix_with_method, f'./OUTPUT/{method}/{sample}/randomized_auroc_auprc.png')
+            
+            # Record the y_true and y_scores for the current sample to plot all sample AUROC and AUPRC between methods
+            total_method_confusion_scores[method]['y_true'].append(confusion_matrix_score_dict['y_true'])
+            total_method_confusion_scores[method]['y_scores'].append(confusion_matrix_score_dict['y_scores'])
+            
+            # Record the original and randomized y_true and y_scores for each sample to compare against the randomized scores
+            randomized_method_dict[f"{method} Original"]['y_true'].append(confusion_matrix_score_dict['y_true'])
+            randomized_method_dict[f"{method} Original"]['y_scores'].append(confusion_matrix_score_dict['y_scores'])
+            
+            randomized_method_dict[f"{method} Randomized"]['y_true'].append(randomized_confusion_matrix_dict['y_true'])
+            randomized_method_dict[f"{method} Randomized"]['y_scores'].append(randomized_confusion_matrix_dict['y_scores'])
+            
+            
+            print(f'\tAppending accuracy metrics to total accuracy metric dict')
+            
+            # Add the auroc and auprc values to the total accuracy metric dictionaries
+            total_accuracy_metrics[method][sample]['auroc'] = auroc
+            total_accuracy_metrics[method][sample]['auprc'] = auprc
+            total_accuracy_metrics[method][sample]['true_positive'] = int(confusion_matrix_score_dict["true_positive"])
+            total_accuracy_metrics[method][sample]['true_negative'] = int(confusion_matrix_score_dict["true_negative"])
+            total_accuracy_metrics[method][sample]['false_positive'] = int(confusion_matrix_score_dict["false_positive"])
+            total_accuracy_metrics[method][sample]['false_negative'] = int(confusion_matrix_score_dict["false_negative"])
+            
+            random_accuracy_metrics[method][sample]['auroc'] = randomized_auroc
+            random_accuracy_metrics[method][sample]['auprc'] = randomized_auprc
+            random_accuracy_metrics[method][sample]['true_positive'] = int(randomized_confusion_matrix_dict["true_positive"])
+            random_accuracy_metrics[method][sample]['true_negative'] = int(randomized_confusion_matrix_dict["true_negative"])
+            random_accuracy_metrics[method][sample]['false_positive'] = int(randomized_confusion_matrix_dict["false_positive"])
+            random_accuracy_metrics[method][sample]['false_negative'] = int(randomized_confusion_matrix_dict["false_negative"])
+        
+        plotting.plot_multiple_method_auroc_auprc(randomized_method_dict, f'./OUTPUT/{method.lower()}_randomized_auroc_auprc.png')
+    
+    plotting.plot_multiple_method_auroc_auprc(total_method_confusion_scores, './OUTPUT/auroc_auprc_combined.png')
+    
+    write_method_accuracy_metric_file(total_accuracy_metrics)
+    write_method_accuracy_metric_file(random_accuracy_metrics)
+    
+
+    
+    for method, sample_dict in total_accuracy_metrics.items():
+        print(method)
+        for sample_name, accuracy_metric_dict in sample_dict.items():
+            print(f'\t{sample_name}')
+            for accuracy_metric, score in accuracy_metric_dict.items():
+                print(f'\t\t{accuracy_metric} = {score:.2f}')
+>>>>>>> 59a2878 (Updated the code to run for multiple methods, currently tested on LINGER and CellOracle. I might need to adjust for more than 2 methods, but it should be fairly robust. Requires a file structure where there is an INPUT file in the same directory as the script containing folders named as each sample name, containing the inferred network for that sample. The ground truth file needs to be in INPUT/GROUND_TRUTH)
                 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(message)s')  
