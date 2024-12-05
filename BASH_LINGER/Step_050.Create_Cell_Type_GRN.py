@@ -24,13 +24,13 @@ if args.organism.lower() == "mouse":
   import linger_1_92.LL_net as LL_net
 
   # Load in the adata_RNA and adata_ATAC files
-  print(f'Reading in the RNAseq and ATACseq h5ad adata')
+  print(f'Reading in the RNAseq and ATACseq h5ad adata', flush=True)
   adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
   adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
   output_dir = args.sample_data_dir + "/"
 
-  print(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_TF_RE_binding(
     args.tss_motif_info_path,
     adata_RNA,
@@ -41,7 +41,7 @@ if args.organism.lower() == "mouse":
     args.method
     )
 
-  print(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_cis_reg(
     args.tss_motif_info_path,
     adata_RNA,
@@ -52,7 +52,7 @@ if args.organism.lower() == "mouse":
     args.method
     )
 
-  print(f'Calculating cell-type specific trans-regulatory network for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific trans-regulatory network for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_trans_reg(
     args.tss_motif_info_path,
     adata_RNA,
@@ -63,13 +63,13 @@ if args.organism.lower() == "mouse":
 elif args.organism.lower() == "human":
   import linger.LL_net as LL_net
   # Load in the adata_RNA and adata_ATAC files
-  print(f'Reading in the RNAseq and ATACseq h5ad adata')
+  print(f'Reading in the RNAseq and ATACseq h5ad adata', flush=True)
   adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
   adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
   output_dir = args.sample_data_dir + "/"
 
-  print(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_TF_RE_binding(
     args.tss_motif_info_path,
     adata_RNA,
@@ -80,7 +80,7 @@ elif args.organism.lower() == "human":
     args.method
     )
 
-  print(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_cis_reg(
     args.tss_motif_info_path,
     adata_RNA,
@@ -91,7 +91,7 @@ elif args.organism.lower() == "human":
     args.method
     )
 
-  print(f'Calculating cell-type specific trans-regulatory network for celltype "{args.celltype}"')
+  print(f'Calculating cell-type specific trans-regulatory network for celltype "{args.celltype}"', flush=True)
   LL_net.cell_type_specific_trans_reg(
     args.tss_motif_info_path,
     adata_RNA,

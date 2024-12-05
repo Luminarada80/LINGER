@@ -22,21 +22,21 @@ output_dir = args.sample_data_dir + "/"
 command = f'paste {os.path.join(args.sample_data_dir, "Peaks.bed")} {os.path.join(args.sample_data_dir, "Peaks.txt")} > {os.path.join(args.sample_data_dir, "region.txt")}'
 subprocess.run(command, shell=True, check=True)
 
-print('\nPreprocessing region.txt for Homer')
+print('\nPreprocessing region.txt for Homer', flush=True)
 # Load and clean the peak file
 peaks = pd.read_csv(os.path.join(args.sample_data_dir, "region.txt"), sep='\t', header=None)
-print(f'Region file shape before cleaning: {peaks.shape}')
+print(f'Region file shape before cleaning: {peaks.shape}', flush=True)
 
 # Remove duplicate entries based on peak coordinates and IDs
 peaks = peaks.drop_duplicates()
 peaks[1] = peaks[1].astype(int)  # Convert coordinates to integers
 peaks[2] = peaks[2].astype(int)
-print(f'Region file shape after cleaning: {peaks.shape}')
+print(f'Region file shape after cleaning: {peaks.shape}', flush=True)
 
 # Save the cleaned peaks file
 peaks.to_csv(os.path.join(args.sample_data_dir, "region.txt"), sep='\t', header=False, index=False)
 
-print('\nRunning Homer')
+print('\nRunning Homer', flush=True)
 # Load genome mapping
 genome_map = pd.read_csv(os.path.join(args.tss_motif_info_path, 'genome_map_homer.txt'), sep='\t', header=0)
 genome_map.index = genome_map['genome_short']
@@ -49,4 +49,4 @@ command = f'findMotifsGenome.pl {os.path.join(args.sample_data_dir, "region.txt"
 try:
     subprocess.run(command, shell=True, check=True)
 except subprocess.CalledProcessError as e:
-    print(f"Error running Homer command: {e}")
+    print(f"Error running Homer command: {e}", flush=True)
