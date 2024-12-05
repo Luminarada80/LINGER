@@ -28,7 +28,7 @@ output_dir = args.sample_data_dir + "/"
 
 if args.organism.lower() == "mouse":
     import linger_1_92.LINGER_tr as LINGER_tr
-    logging.info('Getting TSS')
+    print('Getting TSS', flush=True)
     LINGER_tr.get_TSS(
         args.tss_motif_info_path,
         args.genome, 
@@ -36,7 +36,7 @@ if args.organism.lower() == "mouse":
         output_dir # I altered the function to allow for a different output directory
         ) 
 
-    logging.info('Getting RE-TG distances')
+    print('Getting RE-TG distances', flush=True)
     LINGER_tr.RE_TG_dis(output_dir, args.sample_data_dir)
 
     genomemap=pd.read_csv(args.tss_motif_info_path+'genome_map_homer.txt',sep='\t')
@@ -44,7 +44,7 @@ if args.organism.lower() == "mouse":
     species=genomemap.loc[args.genome]['species_ensembl']
 
     # Refines the bulk model by further training it on the single-cell data
-    logging.info(f'\nBeginning LINGER single cell training...')
+    print(f'\nBeginning LINGER single cell training...', flush=True)
     LINGER_tr.training(
         args.tss_motif_info_path,
         args.method,
@@ -54,13 +54,13 @@ if args.organism.lower() == "mouse":
         species
         )
 
-    logging.info(f'FINISHED TRAINING')
+    print(f'FINISHED TRAINING', flush=True)
 
 elif args.organism.lower() == "human":
     import linger.LINGER_tr as LINGER_tr
 
     # Refines the bulk model by further training it on the single-cell data
-    print(f'\nBeginning LINGER single cell training...')
+    print(f'\nBeginning LINGER single cell training...', flush=True)
     LINGER_tr.training_cpu(
     args.bulk_model_dir,
     output_dir,
@@ -68,4 +68,4 @@ elif args.organism.lower() == "human":
     'Human'
     )
 
-    print(f'FINISHED TRAINING')
+    print(f'FINISHED TRAINING', flush=True)

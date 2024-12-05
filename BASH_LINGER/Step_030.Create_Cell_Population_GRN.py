@@ -23,12 +23,12 @@ elif args.organism.lower() == "human":
   import linger.LL_net as LL_net
 
 # Load in the adata_RNA and adata_ATAC files
-print(f'Reading in the RNAseq and ATACseq h5ad adata')
+print(f'Reading in the RNAseq and ATACseq h5ad adata', flush=True)
 adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
 adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
 # Calculate the TF RE binding potential
-print(f'Calculating the TF RE binding potential')
+print(f'Calculating the TF RE binding potential', flush=True)
 LL_net.TF_RE_binding(
   args.tss_motif_info_path,
   args.sample_data_dir,
@@ -40,7 +40,7 @@ LL_net.TF_RE_binding(
   )
 
 # Calculate the cis-regulatory scores
-print(f'Calculating the cis-regulatory network')
+print(f'Calculating the cis-regulatory network', flush=True)
 LL_net.cis_reg(
   args.tss_motif_info_path,
   args.sample_data_dir,
@@ -52,7 +52,7 @@ LL_net.cis_reg(
   )
 
 # Calculate the trans-regulatory scores
-print(f'Calculating the trans-regulatory network')
+print(f'Calculating the trans-regulatory network', flush=True)
 LL_net.trans_reg(
   args.tss_motif_info_path,
   args.sample_data_dir,
