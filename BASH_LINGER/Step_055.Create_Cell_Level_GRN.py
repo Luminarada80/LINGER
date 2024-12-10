@@ -28,16 +28,25 @@ def process_cells_in_parallel(cell_names_slice, adata_RNA, adata_ATAC, genome, o
     """
     print(f'Processing cells: {cell_names_slice}', flush=True)
     
-    # Call the function to process a subset of cells
-    LL_net.cell_level_TF_RE_binding(
-        tss_motif_info_path,
-        adata_RNA,
-        adata_ATAC,
-        genome,
-        cell_names_slice,
-        output_dir,
-        method
-    )
+    # # Call the function to process a subset of cells
+    # LL_net.cell_level_TF_RE_binding(
+    #     tss_motif_info_path,
+    #     adata_RNA,
+    #     adata_ATAC,
+    #     genome,
+    #     cell_names_slice,
+    #     output_dir,
+    #     method
+    # )
+    LL_net.cell_level_cis_reg(
+      tss_motif_info_path,
+      adata_RNA,
+      adata_ATAC,
+      genome,
+      cell_names_slice,
+      output_dir,
+      method
+      )
 
 def parallelize_cell_processing(adata_RNA, adata_ATAC, genome, output_dir, method, tss_motif_info_path, cell_names):
     """

@@ -2255,11 +2255,12 @@ def cell_type_specific_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cellt
     resultall=pd.DataFrame(combined)
     return resultall  
 
-def cell_level_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cell_name,outdir): 
+def cell_level_cis_reg_chr(
+    GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir
+):
     import numpy as np
     import pandas as pd
-    from scipy.sparse import csc_matrix
-    from scipy.sparse import coo_matrix
+    from scipy.sparse import csc_matrix, coo_matrix
 
     # Load region and regulatory element data
     O_overlap, N_overlap, O_overlap_u, N_overlap_u, O_overlap_hg19_u = load_region(GRNdir, genome, chrN, outdir)
@@ -2274,11 +2275,11 @@ def cell_level_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cell_name,out
     cell_index = adata_RNA.obs_names.tolist().index(cell_name)
 
     # Compute ATAC values for the individual cell
-    atac_values = adata_ATAC.X[cell_index, :].reshape(-1, 1)  # Convert to column vector
+    atac_values = adata_ATAC.X[cell_index, :].toarray().reshape(-1, 1)  # Convert sparse matrix to dense
     RE = pd.DataFrame(atac_values, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
 
     # Compute RNA values for the individual cell
-    rna_values = adata_RNA.X[cell_index, :].reshape(-1, 1)  # Convert to column vector
+    rna_values = adata_RNA.X[cell_index, :].toarray().reshape(-1, 1)  # Convert sparse matrix to dense
     TG = pd.DataFrame(rna_values, index=adata_RNA.var['gene_ids'].values, columns=['values'])
 
     # Extract the overlapped regulatory elements (REs) for the current cell
@@ -2321,9 +2322,6 @@ def cell_level_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cell_name,out
 
     # Convert to DataFrame
     result = pd.DataFrame(combined, columns=['RE', 'TG', 'Score'])
-
-    # Add the cell name to the result DataFrame
-    result['Cell'] = cell_name
     
     return result
 
@@ -2390,11 +2388,13 @@ def cell_level_cis_reg(
         temp = cell_level_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir)
         result = pd.concat([result, temp], axis=0, join='outer')
         
-        if not cell_name in os.listdir(outdir):
-            os.makedirs(os.path.join(outdir, 'cell_name'))
+        # Create directory for the current cell if it does not exist
+        cell_outdir = os.path.join(outdir, f'cell_{cell_name}/')
+        if not os.path.exists(cell_outdir):
+            os.makedirs(cell_outdir)
         
         # Save the results for the current cell
-        result.to_csv(outdir + f'{cell_name}/cell_specific_cis_regulatory.txt', sep='\t', header=None, index=None)
+        result.to_csv(cell_outdir + 'cell_specific_cis_regulatory.txt', sep='\t', header=None, index=None)
 
 
 def cell_type_specific_cis_reg_scNN(
