@@ -1401,6 +1401,10 @@ def cell_level_TF_RE_binding_chr(
     # print(result.head())
     # print(result.shape)
     
+    # Ensure that the gene names (transcription factors) remain as columns
+    max_binding_scores.columns = overlapping_tfs  # Explicitly set column names to the overlapping TFs
+
+    
 
     return max_binding_scores
 
@@ -1438,7 +1442,7 @@ def cell_level_TF_RE_binding(
 
     # Iterate over specific cells in the 'cells' list
     for cell_name in cells:
-        print(f'Processing {cell_name}...', flush=True)
+        print(f'Processing {cell_name}...')
 
         result = pd.DataFrame()
 
@@ -1446,20 +1450,21 @@ def cell_level_TF_RE_binding(
         chrom = ['chr' + str(i + 1) for i in range(22)] + ['chrX']
 
         for chrN in chrom:
-            print(f'\tChr {chrN}', flush=True)
+            print(f'\tChr {chrN}')
             mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
             
             # Call the function to compute binding potentials for the current chromosome
             out = cell_level_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat)
+            print(out.head())
             result = pd.concat([result, out], join='outer', axis=0)
 
         # Create directory for the current cell if it does not exist
-        cell_outdir = os.path.join(outdir, cell_name)
+        cell_outdir = os.path.join(outdir, f'cell_{cell_name}')
         if not os.path.exists(cell_outdir):
             os.makedirs(cell_outdir)
 
         # Save the results for the current cell
-        result.to_csv(os.path.join(cell_outdir, f'cell_specific_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
+        result.to_csv(os.path.join(cell_outdir, f'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
 
 def load_shapley(chr: str, data_dir: str, outdir: str):
     """
