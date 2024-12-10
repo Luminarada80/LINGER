@@ -25,15 +25,6 @@ rcParams.update({
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
-CELL_TYPE = 'mESC' # H1
-
-# ----- THESE VARIABLES NEED TO CHANGE DEPENDING ON DATASET -----
-# Set the value of the CELL_TYPE to 'all' if all TFs are in the cell line
-CELL_TYPE_TF_DICT: dict = {
-    'mESC': 'all'
-}
-# ----------------------------------------------------------------
-
 # Allows the user to input whether they want to analyze the cell population or cell type results
 def parse_args():
     parser = argparse.ArgumentParser(description="Process TF-TG pairs with cell type specificity.")
@@ -80,10 +71,6 @@ def parse_args():
         logging.warning("\n\nWarning! no arguments specified. Defaulting to running cell pop analysis\n")
         args.cell_pop = True
 
-    # Check to make sure the entered cell type is in CELL_TYPE_TF_DICT
-    if not args.cell_pop and not args.cell_type in CELL_TYPE_TF_DICT.keys():
-        parser.error(f"\n\n--cell_type not found in the CELL_TYPE_TF_DICT: \n\n{CELL_TYPE_TF_DICT.keys()}")
-    
     return args
 
 # Parse the arguments

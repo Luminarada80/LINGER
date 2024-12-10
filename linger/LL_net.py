@@ -9,6 +9,7 @@ from torch.nn import functional as F
 import ast
 import scipy.sparse as sp
 from typing import List
+import os
 
 # Set seed for reproducibility
 hidden_size = 64
@@ -986,12 +987,15 @@ def cell_type_specific_TF_RE_binding_chr(
     tf_binding_data = load_TFbinding(grn_directory, region_overlap, unique_overlap, hg19_unique_overlap, chromosome_number)
 
     if method == 'LINGER':
+        
         # Handle cases where some regions are not present in the LINGER binding matrix
         missing_regions = list(set(region_names_overlap) - set(tf_re_binding_matrix.index))
         if len(missing_regions) > 0:
+            
             # Create a DataFrame of zeros for missing regions and concatenate it with the existing matrix
             zeros_matrix = pd.DataFrame(np.zeros((len(missing_regions), tf_re_binding_matrix.shape[1])), columns=tf_re_binding_matrix.columns, index=missing_regions)
             tf_re_binding_matrix = pd.concat([tf_re_binding_matrix, zeros_matrix])
+        
         # Reorder the matrix to match the order of region_names_overlap
         tf_re_binding_matrix = tf_re_binding_matrix.loc[region_names_overlap]
 
@@ -1038,7 +1042,6 @@ def cell_type_specific_TF_RE_binding_chr(
     max_binding_scores = binding_strength.groupby(binding_strength.index).max()
 
     return max_binding_scores
-
 
 def cell_type_specific_TF_RE_binding_score_scNN(
     tf_re_binding_matrix: pd.DataFrame,  # TF-RE binding matrix
@@ -1095,7 +1098,6 @@ def cell_type_specific_TF_RE_binding_score_scNN(
     binding_strength.index = tf_re_binding_matrix.index
 
     return binding_strength
-
 
 def cell_type_specific_TF_RE_binding(
     GRNdir: str, 
@@ -1267,6 +1269,197 @@ def cell_type_specific_TF_RE_binding(
         # Save results
         result.to_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(label0) + '.txt', sep='\t')
 
+
+def cell_level_TF_RE_binding_chr(
+    scRNA_data,  # AnnData object representing scRNA-seq data
+    scATAC_data,  # AnnData object representing scATAC-seq data
+    grn_directory: str,  # Path to the directory containing gene regulatory network data
+    chromosome_number: str,  # Chromosome number (e.g., 'chr1')
+    genome_version: str,  # Genome version (e.g., 'hg38')
+    cell_name: str,  # Specific cell name to compute TF binding for
+    output_directory: str,  # Output directory path
+    method: str,  # Method to use ('baseline' or 'LINGER')
+    tf_re_binding_matrix: pd.DataFrame  # Pre-loaded TF-RE binding matrix (for LINGER method)
+) -> pd.DataFrame:
+    """
+    Computes transcription factor (TF) binding to regulatory elements (RE) for a specific cell on a specific chromosome.
+
+    Parameters:
+        scRNA_data (AnnData):
+            AnnData object representing scRNA-seq data.
+        scATAC_data (AnnData):
+            AnnData object representing scATAC-seq data.
+        grn_directory (str):
+            Path to the directory containing gene regulatory network data.
+        chromosome_number (str):
+            Chromosome number (e.g., 'chr1').
+        genome_version (str):
+            Genome version (e.g., 'hg38').
+        cell_name (str):
+            Specific cell name to compute TF binding for.
+        output_directory (str):
+            Output directory path.
+        method (str):
+            Method to use ('baseline' or 'LINGER').
+        tf_re_binding_matrix (pd.DataFrame):
+            Pre-loaded TF-RE binding matrix (for LINGER method).
+
+    Returns:
+        pd.DataFrame:
+            A DataFrame containing the maximum binding score for each regulatory element for the given cell.
+    """
+
+    # Import necessary libraries
+    import numpy as np
+    import pandas as pd
+
+    # Extract cell names and check if the specified cell exists
+    cell_names = scRNA_data.obs_names  # Assuming the cell names are stored as obs_names in the AnnData object
+    if cell_name not in cell_names:
+        raise ValueError(f'Cell name "{cell_name}" not found in the dataset.')
+
+    # Get the index of the specific cell
+    cell_index = list(cell_names).index(cell_name)
+
+    # Load regions and their overlap information from the gene regulatory network data
+    region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
+
+    # Compute the accessibility of regulatory elements (REs) for the specific cell
+    atac_cell_data = scATAC_data.X[cell_index, :].toarray().reshape(-1, 1) # convert to an array from a coomatrix and reshape columns and rows
+    regulatory_element_accessibility = pd.DataFrame(atac_cell_data, index=scATAC_data.var['gene_ids'].values, columns=['values'])
+
+    # Compute the gene expression (TG) for the specific cell
+    rna_cell_data = scRNA_data.X[cell_index, :].toarray().reshape(-1, 1)  # RNA-seq data for the specific cell
+    target_gene_expression = pd.DataFrame(rna_cell_data, index=scRNA_data.var['gene_ids'].values, columns=['values'])
+
+    # Extract the overlapped peaks from the regulatory element DataFrame
+    regulatory_element_accessibility = regulatory_element_accessibility.loc[region_names_overlap]
+
+    # Load TF binding data for the given chromosome
+    tf_binding_data = load_TFbinding(grn_directory, region_overlap, unique_overlap, hg19_unique_overlap, chromosome_number)
+
+    if method == 'LINGER':
+        # Handle missing regions in the LINGER binding matrix
+        missing_regions = list(set(region_names_overlap) - set(tf_re_binding_matrix.index))
+        if missing_regions:
+            # Create a DataFrame of zeros for missing regions and concatenate it
+            zeros_matrix = pd.DataFrame(np.zeros((len(missing_regions), tf_re_binding_matrix.shape[1])), columns=tf_re_binding_matrix.columns, index=missing_regions)
+            tf_re_binding_matrix = pd.concat([tf_re_binding_matrix, zeros_matrix])
+
+        # Reorder the matrix to match the order of region_names_overlap
+        tf_re_binding_matrix = tf_re_binding_matrix.loc[region_names_overlap]
+
+    if method == 'baseline':
+        # Load the TF-RE binding matrix for the current chromosome
+        tf_re_binding_matrix = load_TF_RE(grn_directory, chromosome_number, region_overlap, unique_overlap, hg19_unique_overlap)
+        tf_re_binding_matrix.index = region_names_overlap
+
+    # Find overlapping TFs between the TF binding matrix and the target gene expression data
+    transcription_factors = tf_re_binding_matrix.columns
+    overlapping_tfs = list(set(transcription_factors) & set(target_gene_expression.index))
+    tf_re_binding_matrix = tf_re_binding_matrix[overlapping_tfs]  # Filter the binding matrix to keep only the overlapping TFs
+    tf_binding_data = tf_binding_data[overlapping_tfs]  # Filter the TF binding data to keep only the overlapping TFs
+    tf_binding_data.index = region_names_overlap
+
+    # Extract the target gene expression (TG) for the overlapping TFs
+    target_genes = target_gene_expression.loc[overlapping_tfs]
+
+    # Normalize the TF-RE binding matrix by the mean of non-zero values
+    binding_matrix_mean = np.mean(tf_re_binding_matrix.values[tf_re_binding_matrix > 0])
+    tf_re_binding_matrix = tf_re_binding_matrix / binding_matrix_mean
+    tf_re_binding_matrix.values[tf_re_binding_matrix.values < 0] = 0
+
+    # Normalize the TF binding data by the mean of all values
+    tf_binding_data = tf_binding_data / tf_binding_data.mean(axis=1).mean()
+
+    # Normalize the target gene expression for the specific cell
+    tf_expression_cluster = target_genes.values
+    tf_expression_cluster = tf_expression_cluster / tf_expression_cluster.mean()
+
+    # Normalize the regulatory element accessibility for the specific cell
+    re_accessibility_cluster = regulatory_element_accessibility.values
+    re_accessibility_cluster = re_accessibility_cluster / re_accessibility_cluster.mean()
+
+    # Compute the TF-RE binding strength using logarithmic transformations
+    binding_strength = (np.log(re_accessibility_cluster + 0.1) + np.log(tf_re_binding_matrix + tf_binding_data + 0.1)).T + np.log(tf_expression_cluster + 0.1)
+
+    # Apply exponential transformation to revert from logarithmic space
+    binding_strength = np.exp(binding_strength.T)
+    binding_strength.index = region_names_overlap
+
+    # Group the binding matrix by regulatory elements and take the maximum binding score for each group
+    max_binding_scores = binding_strength.groupby(binding_strength.index).max()
+    
+    # # Ensure max_binding_scores has the same length as region_names_overlap (no columns should be added back)
+    # max_binding_scores = max_binding_scores.loc[region_names_overlap]
+
+    # # Convert dictionary to DataFrame and transpose it to have cells as rows, REs as columns
+    # result = pd.DataFrame(max_binding_scores).T  # Transpose to have cells as rows, REs as columns
+    
+    # # Ensure unique indices before concatenation
+    # result = result.reset_index(drop=True, inplace=True)  # Reset index if necessary
+    # print(result.head())
+    # print(result.shape)
+    
+
+    return max_binding_scores
+
+def cell_level_TF_RE_binding(
+    GRNdir: str, 
+    adata_RNA, 
+    adata_ATAC, 
+    genome: str, 
+    cells: List[str],  # List of specific cell names to analyze
+    outdir: str, 
+    method: str
+) -> None:
+    """
+    Generates TF binding potentials for regulatory elements (RE) for specific cells based on input scRNA and scATAC data.
+
+    Parameters:
+        GRNdir (str): Directory containing gene regulatory network information.
+        adata_RNA (AnnData): AnnData object for scRNA-seq data.
+        adata_ATAC (AnnData): AnnData object for scATAC-seq data.
+        genome (str): Genome version (e.g., hg38, mm10).
+        cells (List[str]): List of specific cell names to analyze.
+        outdir (str): Directory to output results.
+        method (str): Method used for computing TF binding potentials (e.g., 'scNN').
+
+    Returns:
+        None: Outputs the results to files in the specified output directory.
+    """
+    
+    # Extract the list of cell names (columns) from the RNA data
+    cell_names = adata_RNA.obs_names.tolist()
+
+    # Ensure the provided cell names exist in the dataset
+    if not set(cells).issubset(cell_names):
+        raise ValueError(f"Some specified cells are not present in the dataset.")
+
+    # Iterate over specific cells in the 'cells' list
+    for cell_name in cells:
+        print(f'Processing {cell_name}...', flush=True)
+
+        result = pd.DataFrame()
+
+        # Iterate over chromosomes 1-22 and chromosome X
+        chrom = ['chr' + str(i + 1) for i in range(22)] + ['chrX']
+
+        for chrN in chrom:
+            print(f'\tChr {chrN}', flush=True)
+            mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
+            
+            # Call the function to compute binding potentials for the current chromosome
+            out = cell_level_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat)
+            result = pd.concat([result, out], join='outer', axis=0)
+
+        # Create directory for the current cell if it does not exist
+        cell_outdir = os.path.join(outdir, cell_name)
+        if not os.path.exists(cell_outdir):
+            os.makedirs(cell_outdir)
+
+        # Save the results for the current cell
+        result.to_csv(os.path.join(cell_outdir, f'cell_specific_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
 
 def load_shapley(chr: str, data_dir: str, outdir: str):
     """
@@ -2056,6 +2249,148 @@ def cell_type_specific_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cellt
     combined[:,2]=coo.data
     resultall=pd.DataFrame(combined)
     return resultall  
+
+def cell_level_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cell_name,outdir): 
+    import numpy as np
+    import pandas as pd
+    from scipy.sparse import csc_matrix
+    from scipy.sparse import coo_matrix
+
+    # Load region and regulatory element data
+    O_overlap, N_overlap, O_overlap_u, N_overlap_u, O_overlap_hg19_u = load_region(GRNdir, genome, chrN, outdir)
+    sparse_S, TGset = load_RE_TG(GRNdir, chrN, O_overlap_u, O_overlap_hg19_u, O_overlap)
+
+    # Get cell labels and check if the cell exists in the dataset
+    cell_names = adata_RNA.obs_names.tolist()
+    if cell_name not in cell_names:
+        raise ValueError(f"Cell {cell_name} not found in the dataset.")
+
+    # Get the index for the individual cell
+    cell_index = adata_RNA.obs_names.tolist().index(cell_name)
+
+    # Compute ATAC values for the individual cell
+    atac_values = adata_ATAC.X[cell_index, :].reshape(-1, 1)  # Convert to column vector
+    RE = pd.DataFrame(atac_values, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
+
+    # Compute RNA values for the individual cell
+    rna_values = adata_RNA.X[cell_index, :].reshape(-1, 1)  # Convert to column vector
+    TG = pd.DataFrame(rna_values, index=adata_RNA.var['gene_ids'].values, columns=['values'])
+
+    # Extract the overlapped regulatory elements (REs) for the current cell
+    RE = RE.loc[N_overlap]
+
+    # Select overlapping target genes (TG)
+    TGoverlap = list(set(TGset) & set(TG.index))
+    sparse_S_cell = sparse_S[TGoverlap]
+    TG = TG.loc[TGoverlap]
+
+    # Load RE-TG distance matrix
+    sparse_dis = load_RE_TG_distance(GRNdir, chrN, O_overlap_hg19_u, O_overlap_u, O_overlap, TGoverlap)
+
+    # Adjust the data by adding a small constant for stability
+    sparse_S_cell += 0.1
+    TG_temp = TG.values
+    TG_temp = TG_temp / TG_temp.mean() + 0.1
+    RE_temp = RE.values
+    RE_temp = RE_temp / RE_temp.mean() + 0.1
+
+    # Compute the score for the individual cell
+    Score = csc_matrix(RE_temp).multiply(sparse_S_cell.values).multiply(sparse_dis.values).multiply(csc_matrix(TG_temp.T)).toarray()
+
+    # Convert score to DataFrame and group by RE index
+    Score = pd.DataFrame(Score, index=N_overlap, columns=TGoverlap)
+    Score = Score.groupby(Score.index).max()
+
+    # Extract non-zero values for the final result
+    data = Score.values[Score.values != 0]
+    rows, cols = np.nonzero(Score.values)
+
+    # Create sparse matrix for the results
+    coo = coo_matrix((data, (rows, cols)), shape=Score.shape)
+
+    # Prepare the final result matrix
+    combined = np.zeros([len(data), 3], dtype=object)
+    combined[:, 0] = Score.index[coo.row]
+    combined[:, 1] = np.array(TGoverlap)[coo.col]
+    combined[:, 2] = coo.data
+
+    # Convert to DataFrame
+    result = pd.DataFrame(combined, columns=['RE', 'TG', 'Score'])
+
+    # Add the cell name to the result DataFrame
+    result['Cell'] = cell_name
+    
+    return result
+
+def cell_level_cis_reg(
+    GRNdir: str, 
+    adata_RNA, 
+    adata_ATAC, 
+    genome: str, 
+    cell_names: list,  # List of specific cell names to process
+    outdir: str, 
+    method: str
+) -> None:
+    """
+    Computes cis-regulatory interactions between regulatory elements (REs) and target genes (TGs) for specific cells.
+    The results are saved to individual files for each cell.
+
+    Parameters:
+        GRNdir (str):
+            The directory path where the gene regulatory network (GRN) files are stored.
+        adata_RNA (AnnData):
+            An AnnData object containing single-cell RNA-seq data.
+        adata_ATAC (AnnData):
+            An AnnData object containing single-cell ATAC-seq data.
+        genome (str):
+            The genome version (e.g., 'hg19' or 'hg38').
+        cell_names (list):
+            A list of specific cell names to compute cis-regulatory interactions for.
+        outdir (str):
+            The directory path where the output results will be saved.
+        method (str):
+            The method used to compute cis-regulatory interactions. Valid options are 'baseline', 'LINGER', and 'scNN'.
+
+    Returns:
+        None:
+            The function saves the cis-regulatory results to a text file for each individual cell.
+    """
+
+    import pandas as pd
+    import numpy as np
+
+    # Extract the labels (cell types) from the RNA-seq data
+    label = adata_RNA.obs['label'].values.tolist()
+    labelset = list(set(label))
+
+    # List of chromosome names ('chr1' to 'chr22' and 'chrX')
+    chrom = ['chr' + str(i + 1) for i in range(22)]
+    chrom.append('chrX')
+
+    # Iterate over the specific cells
+    for cell_name in cell_names:
+        print(f"Processing cell {cell_name}...")
+
+        # Initialize an empty DataFrame to store results for the current cell
+        result = pd.DataFrame([])
+
+        # Iterate over all chromosomes
+        for i in range(23):
+            chrN = chrom[i]
+            temp = cell_level_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir)
+            result = pd.concat([result, temp], axis=0, join='outer')
+
+        # Handle 'chrX'
+        chrN = 'chrX'
+        temp = cell_level_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir)
+        result = pd.concat([result, temp], axis=0, join='outer')
+        
+        if not cell_name in os.listdir(outdir):
+            os.makedirs(os.path.join(outdir, 'cell_name'))
+        
+        # Save the results for the current cell
+        result.to_csv(outdir + f'{cell_name}/cell_specific_cis_regulatory.txt', sep='\t', header=None, index=None)
+
 
 def cell_type_specific_cis_reg_scNN(
     distance: csr_matrix, 

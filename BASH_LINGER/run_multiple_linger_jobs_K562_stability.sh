@@ -3,16 +3,16 @@
 # Define sample numbers
 
 SAMPLE_NUMS=(
-  K562_stability_1
-  # K562_stability_2
-  # K562_stability_3
-  # K562_stability_4
-  # K562_stability_5
-  # K562_stability_6
-  # K562_stability_7
-  # K562_stability_8
-  # K562_stability_9
-  # K562_stability_10
+  # K562_stability_1
+  K562_stability_2
+  K562_stability_3
+  K562_stability_4
+  K562_stability_5
+  K562_stability_6
+  K562_stability_7
+  K562_stability_8
+  K562_stability_9
+  K562_stability_10
 )
 
 # Submit each SAMPLE_NUM as a separate job
