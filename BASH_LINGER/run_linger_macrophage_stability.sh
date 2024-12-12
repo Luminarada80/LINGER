@@ -2,7 +2,7 @@
 
 #SBATCH -p compute
 #SBATCH --nodes=1
-#SBATCH -c 16
+#SBATCH -c 32
 #SBATCH --mem-per-cpu=16G
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null
@@ -31,7 +31,7 @@ ORGANISM='human'
 BULK_MODEL_DIR="/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_BULK_MODEL/"
 
 # Paths in the data directory
-DATA_DIR="/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MACROPHAGE_STABILITY"
+DATA_DIR="/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MACROPHAGE"
 
 RNA_DATA_PATH="${DATA_DIR}/subsampled_70_RNA_${SAMPLE_NUM}.csv"
 ATAC_DATA_PATH="${DATA_DIR}/subsampled_70_ATAC_${SAMPLE_NUM}.csv"
@@ -39,7 +39,7 @@ TSS_MOTIF_INFO_PATH="" #${DATA_DIR}/LINGER_OTHER_SPECIES_TF_MOTIF_DATA/provide_d
 GROUND_TRUTH_PATH="${DATA_DIR}/RN204_macrophage_ground_truth.tsv"
 
 # Paths in the results directory
-RESULTS_DIR="/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_STABILITY_RESULTS"
+RESULTS_DIR="/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS"
 
 SAMPLE_RESULTS_DIR="${RESULTS_DIR}/${SAMPLE_NUM}"
 SAMPLE_DATA_DIR="${RESULTS_DIR}/LINGER_TRAINED_MODELS/${SAMPLE_NUM}/"
@@ -60,51 +60,59 @@ run_step() {
   /usr/bin/time -v python3 "$script_path" "$@" 2>> "${LOG_DIR}/${SAMPLE_NUM}/${step_name}_time_mem.log"
 }
 
-#Run each step of the pipeline with resource tracking
-run_step "Step_010.Linger_Load_Data" "${SCRIPTS_DIR}/Step_010.Linger_Load_Data.py" \
-  --rna_data_path "$RNA_DATA_PATH" \
-  --atac_data_path "$ATAC_DATA_PATH" \
-  --data_dir "$DATA_DIR" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --organism "$ORGANISM" \
-  --bulk_model_dir "$BULK_MODEL_DIR" \
-  --genome "$GENOME" \
-  --method "$METHOD"
+# #Run each step of the pipeline with resource tracking
+# run_step "Step_010.Linger_Load_Data" "${SCRIPTS_DIR}/Step_010.Linger_Load_Data.py" \
+#   --rna_data_path "$RNA_DATA_PATH" \
+#   --atac_data_path "$ATAC_DATA_PATH" \
+#   --data_dir "$DATA_DIR" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --organism "$ORGANISM" \
+#   --bulk_model_dir "$BULK_MODEL_DIR" \
+#   --genome "$GENOME" \
+#   --method "$METHOD"
 
-run_step "Step_020.Linger_Training" "${SCRIPTS_DIR}/Step_020.Linger_Training.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --genome "$GENOME" \
-  --method "$METHOD" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --activef "$ACTIVEF" \
-  --organism "$ORGANISM" \
-  --bulk_model_dir "$BULK_MODEL_DIR"
+# run_step "Step_020.Linger_Training" "${SCRIPTS_DIR}/Step_020.Linger_Training.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --activef "$ACTIVEF" \
+#   --organism "$ORGANISM" \
+#   --bulk_model_dir "$BULK_MODEL_DIR"
 
-run_step "Step_030.Create_Cell_Population_GRN" "${SCRIPTS_DIR}/Step_030.Create_Cell_Population_GRN.py" \
-  --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-  --genome "$GENOME" \
-  --method "$METHOD" \
-  --sample_data_dir "$SAMPLE_DATA_DIR" \
-  --activef "$ACTIVEF" \
-  --organism "$ORGANISM" 
+# run_step "Step_030.Create_Cell_Population_GRN" "${SCRIPTS_DIR}/Step_030.Create_Cell_Population_GRN.py" \
+#   --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --activef "$ACTIVEF" \
+#   --organism "$ORGANISM" 
 
-# Only run homer motif finding if the organism is mouse
-if [[ "$ORGANISM" == "mouse" ]]; then
-  run_step "Step_040.Homer_Motif_Finding" "${SCRIPTS_DIR}/Step_040.Homer_Motif_Finding.py" \
-    --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-    --sample_data_dir "$SAMPLE_DATA_DIR" \
-    --genome "$GENOME"
+# # Only run homer motif finding if the organism is mouse
+# if [[ "$ORGANISM" == "mouse" ]]; then
+#   run_step "Step_040.Homer_Motif_Finding" "${SCRIPTS_DIR}/Step_040.Homer_Motif_Finding.py" \
+#     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#     --sample_data_dir "$SAMPLE_DATA_DIR" \
+#     --genome "$GENOME"
 
-  run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
-    --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-    --genome "$GENOME" \
-    --method "$METHOD" \
-    --sample_data_dir "$SAMPLE_DATA_DIR" \
-    --celltype "$CELLTYPE" \
-    --organism "$ORGANISM" 
-fi
+#   run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
+#     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#     --genome "$GENOME" \
+#     --method "$METHOD" \
+#     --sample_data_dir "$SAMPLE_DATA_DIR" \
+#     --celltype "$CELLTYPE" \
+#     --organism "$ORGANISM" 
+# fi
 
-run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
+# run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
+#   --tss_motif_info_path "$BULK_MODEL_DIR" \
+#   --genome "$GENOME" \
+#   --method "$METHOD" \
+#   --sample_data_dir "$SAMPLE_DATA_DIR" \
+#   --celltype "$CELLTYPE" \
+#   --organism "$ORGANISM" 
+
+  run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
   --tss_motif_info_path "$BULK_MODEL_DIR" \
   --genome "$GENOME" \
   --method "$METHOD" \
