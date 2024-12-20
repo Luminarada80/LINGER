@@ -62,6 +62,8 @@ if "K562" in args.rna_data_path:
     cell_type = 'K562'
 elif "Macrophase" in args.rna_data_path:
     cell_type = "macrophage"
+elif "filtered_L2" in args.rna_data_path:
+    cell_type = 'mESC'
 
 label = pd.DataFrame({
     'barcode_use': barcodes[0].values,  # Use the same barcodes as in the RNA and ATAC data

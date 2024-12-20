@@ -39,7 +39,7 @@ TSS_MOTIF_INFO_PATH="" #${DATA_DIR}/LINGER_OTHER_SPECIES_TF_MOTIF_DATA/provide_d
 GROUND_TRUTH_PATH="${DATA_DIR}/RN204_macrophage_ground_truth.tsv"
 
 # Paths in the results directory
-RESULTS_DIR="/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_RESULTS"
+RESULTS_DIR="/gpfs/Labs/Uzun/RESULTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/MACROPHAGE_STABILITY_RESULTS/LINGER_TRAINED_MODELS/LINGER_TRAINED_MODELS"
 
 SAMPLE_RESULTS_DIR="${RESULTS_DIR}/${SAMPLE_NUM}"
 SAMPLE_DATA_DIR="${RESULTS_DIR}/LINGER_TRAINED_MODELS/${SAMPLE_NUM}/"
@@ -104,21 +104,21 @@ run_step() {
 #     --organism "$ORGANISM" 
 # fi
 
-# run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
-#   --tss_motif_info_path "$BULK_MODEL_DIR" \
-#   --genome "$GENOME" \
-#   --method "$METHOD" \
-#   --sample_data_dir "$SAMPLE_DATA_DIR" \
-#   --celltype "$CELLTYPE" \
-#   --organism "$ORGANISM" 
-
-  run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
+run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
   --tss_motif_info_path "$BULK_MODEL_DIR" \
   --genome "$GENOME" \
   --method "$METHOD" \
   --sample_data_dir "$SAMPLE_DATA_DIR" \
   --celltype "$CELLTYPE" \
   --organism "$ORGANISM" 
+
+  # run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
+  # --tss_motif_info_path "$BULK_MODEL_DIR" \
+  # --genome "$GENOME" \
+  # --method "$METHOD" \
+  # --sample_data_dir "$SAMPLE_DATA_DIR" \
+  # --celltype "$CELLTYPE" \
+  # --organism "$ORGANISM" 
 
 # run_step "Step_060.Analyze_Results" "${SCRIPTS_DIR}/Step_060.Analyze_Results.py" \
 #   --result_dir "$SAMPLE_RESULTS_DIR" \

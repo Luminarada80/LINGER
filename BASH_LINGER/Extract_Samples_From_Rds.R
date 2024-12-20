@@ -3,9 +3,9 @@ library(data.table)
 library(Matrix)
 library(tools)
 
-karamveer_dir = "/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/Macrophase_data/STABILITY_ANALYSIS"
+karamveer_dir = "/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.KARAMVEER/CURRENT.DS14_mESC.FILTERED"
 
-outdir = "/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MACROPHAGE_STABILITY"
+outdir = "/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MESC_SC_DATA/FULL_MESC_SAMPLES"
 
 # Look through each subdirectory
 sample_dirs <- list.dirs(karamveer_dir, full.names = TRUE, recursive = FALSE)
@@ -15,8 +15,8 @@ for (subsample_dir in sample_dirs) {
   
   # Find a list of RDS files
   cat("Processing directory: ", basename(subsample_dir), "\n")
-  rds_files <- list.files(subsample_dir, pattern = "\\.rds$", full.names = TRUE)
-  
+  rds_files <- list.files(subsample_dir, pattern = "filtered", full.names = TRUE)
+  cat(rds_files)
   for (rds_file in rds_files) {
     cat("\tProcessing file: ", basename(rds_file), "\n")
     
@@ -100,9 +100,10 @@ for (subsample_dir in sample_dirs) {
     # IF ITS COMBINED DATA  
     } else {
       cat("\t\tProcessing combined RNA and ATAC data\n")
+      #cat(Assays(dataset)) # If the assay changes, this will display them
       
-      rna_counts <- GetAssayData(dataset, assay = "RNA", slot = "counts")
-      atac_counts <- GetAssayData(dataset, assay = "peaks", slot = "counts")
+      rna_counts <- GetAssayData(dataset, assay = "RNA", layer = "counts")
+      atac_counts <- GetAssayData(dataset, assay = "ATAC", layer = "counts")
       
       rna_output_file <- file.path(outdir, paste0(base_filename, "_RNA.csv"))
       atac_output_file <- file.path(outdir, paste0(base_filename, "_ATAC.csv"))
