@@ -1455,7 +1455,6 @@ def cell_level_TF_RE_binding(
             
             # Call the function to compute binding potentials for the current chromosome
             out = cell_level_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat)
-            print(out.head())
             result = pd.concat([result, out], join='outer', axis=0)
 
         # Create directory for the current cell if it does not exist
@@ -2362,10 +2361,6 @@ def cell_level_cis_reg(
     import pandas as pd
     import numpy as np
 
-    # Extract the labels (cell types) from the RNA-seq data
-    label = adata_RNA.obs['label'].values.tolist()
-    labelset = list(set(label))
-
     # List of chromosome names ('chr1' to 'chr22' and 'chrX')
     chrom = ['chr' + str(i + 1) for i in range(22)]
     chrom.append('chrX')
@@ -2771,6 +2766,74 @@ def load_cis(
 
     return cis
 
+def load_cell_specific_cis(
+    Binding: pd.DataFrame, 
+    outdir: str
+) -> pd.DataFrame:
+    """
+    Loads and processes cis-regulatory interactions for a given cell type or population. This function creates a matrix 
+    representing cis-regulatory interactions between regulatory elements (REs) and target genes (TGs) using binding data.
+
+    Parameters:
+        Binding (pd.DataFrame):
+            A DataFrame representing the binding data between regulatory elements (REs) and transcription factors (TFs). 
+            The rows are REs, and the columns are TFs.
+        celltype (str):
+            The specific cell type for which to load cis-regulatory interactions. 
+            If an empty string is passed, the function loads population-level cis-regulatory data.
+        outdir (str):
+            The directory path where the cis-regulatory data files are stored.
+
+    Returns:
+        pd.DataFrame:
+            A DataFrame representing the cis-regulatory interaction matrix, where rows are REs and columns are TGs. 
+            The values represent the cis-regulatory interaction scores.
+    """
+
+    from scipy.sparse import coo_matrix
+    import pandas as pd
+    import numpy as np
+
+    # Load cell-level cis-regulatory data if no specific cell type is provided
+    cis = pd.read_csv(outdir + 'cell_specific_cis_regulatory.txt', sep='\t', header=None)
+
+    # Set column names for the cis-regulatory DataFrame
+    cis.columns = ['RE', 'TG', 'Score']
+
+    # Get unique target genes (TGs) and regulatory elements (REs) from the cis-regulatory data
+    TGset = cis['TG'].unique()  # Unique target genes
+    REset = Binding.index       # REs from the binding data
+    TFset = Binding.columns     # Transcription factors (TFs) from the binding data
+
+    # Create dictionaries to map TGs and REs to integer indices
+    col_dict = {col: i for i, col in enumerate(TGset)}  # TG to index
+    row_dict = {row: i for i, row in enumerate(REset)}  # RE to index
+
+    # Filter the cis-regulatory data to include only REs present in the binding data
+    cis = cis[cis["RE"].isin(REset)]
+
+    # Map TG and RE names to their integer indices in the DataFrame
+    cis["col_index"] = cis["TG"].map(col_dict)
+    cis["row_index"] = cis["RE"].map(row_dict)
+
+    # Extract column indices, row indices, and cis-regulatory scores from the DataFrame
+    col_indices = cis["col_index"].tolist()
+    row_indices = cis["row_index"].tolist()
+    values = cis["Score"].tolist()
+
+    # Create a sparse matrix for the cis-regulatory interactions using coo_matrix
+    sparse_S = coo_matrix((values, (row_indices, col_indices)), shape=(len(REset), len(TGset)))
+
+    # Set the row and column names for the sparse matrix
+    sparse_S.colnames = TGset
+    sparse_S.rownames = REset
+
+    # Convert the sparse matrix to a dense matrix (NumPy array) and then to a DataFrame
+    cis = sparse_S.toarray()
+    cis = pd.DataFrame(cis, index=REset, columns=TGset)
+
+    return cis
+
 
 def load_TF_TG(
     GRNdir: str, 
@@ -3040,6 +3103,56 @@ def cell_type_specific_trans_reg(
         # Save the trans-regulatory network for the specified cell type to a file
         S.to_csv(outdir + 'cell_type_specific_trans_regulatory_' + celltype + '.txt', sep='\t')
 
+
+def cell_level_trans_reg(
+    cell_names: list, 
+    outdir: str
+) -> None:
+    """
+    Computes cell-type-specific trans-regulatory networks for given cell types using RNA-seq data. The function calculates 
+    transcription factor (TF) and target gene (TG) interactions for each cell type based on their cis-regulatory networks, 
+    and saves the results to a file.
+
+    Parameters:
+        GRNdir (str):
+            The directory path where the gene regulatory network (GRN) files are stored.
+        adata_RNA (AnnData):
+            An AnnData object containing single-cell RNA-seq data.
+        celltype (str):
+            The specific cell type for which to compute trans-regulatory interactions.
+            If 'all', interactions for all cell types in the RNA-seq data will be computed.
+        outdir (str):
+            The directory path where the output results will be saved.
+
+    Returns:
+        None:
+            The function saves the trans-regulatory network to a text file for each cell type or the selected cell type.
+    """
+    for cell_name in cell_names:  # Iterate over all cell types
+        
+        # Create directory for the current cell if it does not exist
+        cell_outdir = os.path.join(outdir, f'cell_{cell_name}/')
+        if not os.path.exists(cell_outdir):
+            os.makedirs(cell_outdir)
+            
+        # Load cell-type-specific TF-RE binding data for the current cell type
+        Binding = pd.read_csv(cell_outdir + 'cell_specific_TF_RE_binding' + '.txt', sep='\t', index_col=0)
+
+        # Load the cis-regulatory network for the current cell type
+        cis = load_cell_specific_cis(Binding, cell_outdir)
+
+        # Get the sets of transcription factors (TFs) and target genes (TGs)
+        TFset = Binding.columns
+        TGset = cis.columns
+
+        # Calculate the trans-regulatory network using matrix multiplication
+        S = np.matmul(Binding.values.T, cis.values).T  # TF-RE binding and cis-regulatory interactions
+
+        # Convert the resulting matrix into a DataFrame
+        S = pd.DataFrame(S, index=TGset, columns=TFset)
+
+        # Save the trans-regulatory network for the current cell type to a file
+        S.to_csv(cell_outdir + 'cell_specific_trans_regulatory' + '.txt', sep='\t')
 
 def TF_RE_scNN(
     TFName: np.ndarray, 

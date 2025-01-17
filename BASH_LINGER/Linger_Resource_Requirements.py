@@ -25,10 +25,10 @@ rcParams.update({
 })
 
 # The path to the LOGS directory
-LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS'
+LOG_DIR = '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER/LOGS/'
 
 # List the directories to the resource logging files for each sample
-SAMPLE_LIST = ["macrophage_1", "macrophage_2", "macrophage_3", "macrophage_4"]
+SAMPLE_LIST = ["Macrophase", "macrophage_2", "macrophage_3", "macrophage_4"]
 
 def parse_wall_clock_time(line):
     # Extract the time part after the last mention of 'time'
@@ -154,18 +154,20 @@ if __name__ == '__main__':
     # Define a dictionary to hold the sample names with their resource requirements for each step in the pipeline
     sample_resource_dict = {}
     
-    samples = ["1", "2", "3", "4"]
+    samples = ["K562_human_filtered"]
     
     sample_list = [
         sample_dir for sample_dir in os.listdir(LOG_DIR)
-        if any(rep in sample_dir for rep in samples)
+        if sample_dir in samples
+        # if rep in sample_dir for rep in samples
     ]
 
     for sample_log_dir in os.listdir(LOG_DIR):
-        print(f'Analyzing {sample_log_dir}')
+        
         
         # Find each sample in the LOGS directory
         if sample_log_dir in sample_list:
+            print(f'Analyzing {sample_log_dir}')
             # Initialize pipeline_step_dict once per sample_log_dir
             sample_resource_dict[sample_log_dir] = {}
             
