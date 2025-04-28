@@ -54,8 +54,8 @@ def load_data_ptb(Input_dir,outdir,GRNdir):
     label_file='label.txt'
     TFName=os.path.join(outdir, 'TFName.txt')
 
-    RNA=pd.read_csv(Input_dir+RNA_file,sep='\t',index_col=0)
-    ATAC=pd.read_csv(Input_dir+ATAC_file,sep='\t',index_col=0)
+    RNA=pd.read_csv(os.path.join(Input_dir, RNA_file),sep='\t',index_col=0)
+    ATAC=pd.read_csv(os.path.join(Input_dir, ATAC_file),sep='\t',index_col=0)
     RNA = np.log2(1 + RNA)
 
     K=int(np.floor(np.sqrt(RNA.shape[1])))
@@ -69,16 +69,16 @@ def load_data_ptb(Input_dir,outdir,GRNdir):
     #Opn=Opn.values
     idx=pd.read_csv(idx_file,header=None,sep='\t')
     #Target=pd.read_csv(geneexp_file,header=0,sep='\t',index_col=0)
-    genename=pd.read_csv(outdir+'Symbol.txt',sep='\t',header=None)
+    genename=pd.read_csv(os.path.join(outdir, 'Symbol.txt'),sep='\t',header=None)
     genename=genename[0].values
-    TFname=pd.read_csv(outdir+'TFName.txt',sep='\t',header=None)
+    TFname=pd.read_csv(os.path.join(outdir, 'TFName.txt'),sep='\t',header=None)
     TFname=TFname[0].values
     Exp=TG_filter1.loc[TFname].values
     Target=TG_filter1.loc[genename].values
     Opn=RE_filter1.values
     chrall=[str(i+1) for i in range(22)]
     chrall.append('X')
-    data_merge=pd.read_csv(outdir+'data_merge.txt',sep='\t',index_col=0)
+    data_merge=pd.read_csv(os.path.join(outdir, 'data_merge.txt'),sep='\t',index_col=0)
     return chrall,data_merge,Exp,Opn,Target,idx,TFname
 
 def LINGER_simulation(ii,gene_chr,TFindex,Exp,REindex,Opn,netall,index_all):
@@ -119,15 +119,15 @@ def get_simulation(outdir,chrall,data_merge,GRNdir,Exp,Opn,Target,idx):
         logging.info(chr)
         gene_chr=data_merge[data_merge['chr']==chr]
         N=len(gene_chr)
-        netall=torch.load(outdir+'net_'+chr+'.pt')
-        idx_file1=GRNdir+chr+'_index.txt'
-        idx_file_all=GRNdir+chr+'_index_all.txt'
+        netall=torch.load(os.path.join(outdir, f'net_{chr}.pt'))
+        idx_file1=os.path.join(GRNdir, f'{chr}_index.txt')
+        idx_file_all=os.path.join(GRNdir, f'{chr}_index_all.txt')
         idxRE_all=pd.read_csv(idx_file_all,header=None,sep='\t')
         gene_chr=data_merge[data_merge['chr']==chr]
         N=len(gene_chr)
         TFindex=idx.values[:,2]
         REindex=idx.values[:,1]
-        for ii in tqdm(range(N)):
+        for ii in range(N):
             index_all=gene_chr.index[ii]
             if index_all in netall.keys():
                 res=LINGER_simulation(ii,gene_chr,TFindex,Exp,REindex,Opn,netall,index_all)
@@ -137,7 +137,7 @@ def get_simulation(outdir,chrall,data_merge,GRNdir,Exp,Opn,Target,idx):
 def umap_embedding(outdir,Target,original,perturb,Input_dir):
 
 #RNA=pd.read_csv(Input_dir+'RNA.txt',header=0,index_col=0,sep='\t')
-    Symbol=pd.read_csv(outdir+'Symbol.txt',header=None,sep='\t')
+    Symbol=pd.read_csv(os.path.join(outdir, 'Symbol.txt'),header=None,sep='\t')
 #sampleall=RNA.columns
     RNA=pd.DataFrame(Target,index=Symbol[0].values)
 # Assuming your feature * sample matrix is stored in a variable "matrix"
@@ -177,7 +177,7 @@ def umap_embedding(outdir,Target,original,perturb,Input_dir):
 # Define the color for small values (e.g., white) and the color for higher values
 def diff_umap(TFko,TFName,save,outdir,embedding,perturb,original,Input_dir):
 
-    label=pd.read_csv(Input_dir+'label.txt',sep='\t',header=None)
+    label=pd.read_csv(os.path.join(Input_dir, 'label.txt'),sep='\t',header=None)
     label=label[0].values
     zero_color = 'white'
     positive_color = 'orange'
@@ -203,14 +203,14 @@ def diff_umap(TFko,TFName,save,outdir,embedding,perturb,original,Input_dir):
     plt.xlabel('Umap 1')
     plt.ylabel('Umap 2')
     if save==True:
-        plt.savefig(outdir+TFko+"_KO_Diff_exp_Umap_"+TFName+".png", format='png', bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, f'{TFko}_KO_Diff_exp_Umap_{TFName}.png'), format='png', bbox_inches='tight')
 # Add arrows to indicate gene expression changes
     plt.show()
     plt.close()
 # Define the colors for each cluster
 def Umap_direct(TFko,Input_dir,embedding,D,save,outdir):
 
-    label=pd.read_csv(Input_dir+'label.txt',sep='\t',header=None)
+    label=pd.read_csv(os.path.join(Input_dir, 'label.txt'),sep='\t',header=None)
     label=label[0].values
     N=len(np.unique(label))
     colors = generate_colors(N)
@@ -238,5 +238,5 @@ def Umap_direct(TFko,Input_dir,embedding,D,save,outdir):
           2*D[idx,1],  # Assuming gene_index+1 is the index of another gene for the y-component
           scale=30, scale_units='inches', alpha=0.5)
     if save==True:
-        plt.savefig(outdir+TFko+"_KO_Differentiation_Umap.png", format='png', bbox_inches='tight')
+        plt.savefig(os.path.join(outdir, f'{TFko}_KO_Differentiation_Umap.png'), format='png', bbox_inches='tight')
     plt.show()
