@@ -6,11 +6,13 @@ import anndata
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse import  csc_matrix
-from tqdm import tqdm
 import pybedtools
 import pandas as pd
 import os
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 def list2mat(df: pd.DataFrame, i_n: str, j_n: str, x_n: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -86,7 +88,7 @@ def gene_expression(GRNdir: str, TG_pseudobulk: pd.DataFrame, outdir: str) -> tu
     """
     
     # Read the bulk gene list from the specified directory
-    gene = pd.read_csv(GRNdir + 'bulk_gene_all.txt')
+    gene = pd.read_csv(os.path.join(GRNdir, 'bulk_gene_all.txt'))
     gene.columns = ['gene']  # Rename column to 'gene'
     
     # Filter TG_pseudobulk to include only genes found in the bulk gene list
@@ -97,13 +99,13 @@ def gene_expression(GRNdir: str, TG_pseudobulk: pd.DataFrame, outdir: str) -> tu
     A = np.log2(1 + TG_pseudobulk.loc[List])
 
     # Write the log2-transformed gene expression data to 'Exp.txt'
-    pd.DataFrame(A).to_csv(outdir + 'Exp.txt', sep='\t', index=False, header=False)
+    pd.DataFrame(A).to_csv(os.path.join(outdir, 'Exp.txt'), sep='\t', index=False, header=False)
     
     # Write the list of filtered genes to 'Symbol.txt'
-    pd.DataFrame(List).to_csv(outdir + 'Symbol.txt', sep='\t', header=False, index=False)
+    pd.DataFrame(List).to_csv(os.path.join(outdir, 'Symbol.txt'), sep='\t', header=False, index=False)
     
     # Write the column headers (samples) to 'Col.txt'
-    pd.DataFrame(A.columns).to_csv(outdir + 'Col.txt', sep='\t', index=False, header=False)
+    pd.DataFrame(A.columns).to_csv(os.path.join(outdir, 'Col.txt'), sep='\t', index=False, header=False)
     
     # Return the list of filtered genes and the transformed gene expression data
     return List, A
@@ -162,10 +164,10 @@ def TF_expression(TFName: np.ndarray, List: pd.Index, Match2: np.ndarray, A: pd.
     TF = TF[d, :]  # Filtered TF expression data
 
     # Save the filtered TF expression data to 'TFexp.txt'
-    pd.DataFrame(TF).to_csv(outdir + 'TFexp.txt', sep='\t', header=False, index=False)
+    pd.DataFrame(TF).to_csv(os.path.join(outdir, 'TFexp.txt'), sep='\t', header=False, index=False)
     
     # Save the filtered TF names to 'TFName.txt'
-    pd.DataFrame(TFName).to_csv(outdir + 'TFName.txt', sep='\t', header=False, index=False)
+    pd.DataFrame(TFName).to_csv(os.path.join(outdir, 'TFName.txt'), sep='\t', header=False, index=False)
 
     # Return the filtered TFName array
     return TFName
@@ -244,7 +246,7 @@ def load_corr_RE_TG(List: pd.Index, Element_name: pd.Index, Element_name_bulk: p
     """
     
     # Load the correlation between regulatory elements and target genes from a file
-    Element_gene = pd.read_csv(outdir + "hg19_Peak_hg19_gene_u.txt", delimiter="\t", header=None)
+    Element_gene = pd.read_csv(os.path.join(outdir, "hg19_Peak_hg19_gene_u.txt"), delimiter="\t", header=None)
 
     # Create index DataFrames for element names in single-cell and bulk data
     index_ElementName = pd.DataFrame(np.arange(0, len(Element_name)), index=Element_name)
@@ -297,13 +299,13 @@ def load_motifbinding_chr(chrN: str, GRNdir: str, motifWeight: pd.DataFrame, out
     """
     
     # Load motif binding matrix for the given chromosome
-    Motif_binding_temp = pd.read_csv(GRNdir + 'MotifTarget_Matrix_' + chrN + '.txt', sep='\t', index_col=0)
+    Motif_binding_temp = pd.read_csv(os.path.join(GRNdir, f'MotifTarget_Matrix_{chrN}.txt'), sep='\t', index_col=0)
     
     # Extract regulatory elements (REs) from the motif binding matrix
     REs = Motif_binding_temp.index
     
     # Load the region mapping file between hg19 and hg38 for the given chromosome
-    march_hg19_Regrion = pd.read_csv(outdir + 'MotifTarget_hg19_hg38_' + chrN + '.txt', sep='\t', header=None)
+    march_hg19_Regrion = pd.read_csv(os.path.join(outdir, f'MotifTarget_hg19_hg38_{chrN}.txt'), sep='\t', header=None)
     
     # Identify overlapping regions between the motif binding data and region mapping
     REoverlap = list(set(march_hg19_Regrion[1].values))
@@ -440,7 +442,7 @@ def load_TFbinding(GRNdir: str, motifWeight: pd.DataFrame, Match2: np.ndarray, T
     TF_binding = pd.DataFrame(TF_binding, index=Element_name, columns=TFName)
 
     # Save the final TF binding matrix to a text file
-    TF_binding.to_csv(outdir + 'TF_binding.txt', sep='\t', index=None, header=None)
+    TF_binding.to_csv(os.path.join(outdir, 'TF_binding.txt'), sep='\t', index=None, header=None)
 
 
 def extract_overlap_regions(
@@ -564,7 +566,7 @@ def extract_overlap_regions(
             intersection.saveas(os.path.join(output_dir, f'Region_overlap_{chrom}.bed'))
     
     else:
-        print(f"Method '{method}' not found. Please choose 'LINGER' or 'baseline'")
+        logging.info(f"Method '{method}' not found. Please choose 'LINGER' or 'baseline'")
 
 
 def preprocess(
@@ -606,11 +608,11 @@ def preprocess(
     if method == 'LINGER':
         # Overlap genomic regions with bulk data
         extract_overlap_regions(genome, grn_dir, output_dir, method, peak_file)
-        print('Mapping gene expression...')
+        logging.info('Mapping gene expression...')
 
         # Read transcription factor names and match table
-        tf_names: pd.Series = pd.read_csv(grn_dir + 'TFName.txt', header=None)[0]
-        match_table: np.ndarray = pd.read_csv(grn_dir + 'Match2.txt', sep='\t').values
+        tf_names: pd.Series = pd.read_csv(os.path.join(grn_dir, 'TFName.txt'), header=None)[0]
+        match_table: np.ndarray = pd.read_csv(os.path.join(grn_dir, 'Match2.txt'), sep='\t').values
 
         # Generate gene expression data
         gene_list, expression_matrix = gene_expression(grn_dir, TG_pseudobulk, output_dir)
@@ -618,20 +620,20 @@ def preprocess(
         # Check if any matching genes are found
         if not gene_list.empty:
             # Save gene expression-related data to files
-            pd.DataFrame(expression_matrix).to_csv(output_dir + 'Exp.txt', sep='\t', index=False, header=False)
-            pd.DataFrame(gene_list).to_csv(output_dir + 'Symbol.txt', sep='\t', index=False, header=False)
-            pd.DataFrame(expression_matrix.columns).to_csv(output_dir + 'Col.txt', sep='\t', index=False, header=False)
+            pd.DataFrame(expression_matrix).to_csv(os.path.join(output_dir, 'Exp.txt'), sep='\t', index=False, header=False)
+            pd.DataFrame(gene_list).to_csv(os.path.join(output_dir, 'Symbol.txt'), sep='\t', index=False, header=False)
+            pd.DataFrame(expression_matrix.columns).to_csv(os.path.join(output_dir, 'Col.txt'), sep='\t', index=False, header=False)
 
-            print('Generating TF expression...')
+            logging.info('Generating TF expression...')
             tf_names = TF_expression(tf_names.values, gene_list, match_table, expression_matrix, output_dir)
 
-            print('Generating chromatin accessibility for regulatory elements...')
+            logging.info('Generating chromatin accessibility for regulatory elements...')
             RE_pseudobulk.to_csv(output_dir + 'Openness.txt', sep='\t', header=None, index=None)
 
-            print('Generating TF binding data...')
-            bulk_element_names: np.ndarray = pd.read_csv(grn_dir + 'all_hg19.txt', delimiter="\t", header=None)[0].values
+            logging.info('Generating TF binding data...')
+            bulk_element_names: np.ndarray = pd.read_csv(os.path.join(grn_dir, 'all_hg19.txt'), delimiter="\t", header=None)[0].values
             element_names: pd.Index = RE_pseudobulk.index
-            motif_weights: pd.DataFrame = pd.read_csv(grn_dir + 'motifWeight.txt', index_col=0, sep='\t')
+            motif_weights: pd.DataFrame = pd.read_csv(os.path.join(grn_dir, 'motifWeight.txt'), index_col=0, sep='\t')
 
             # Generate TF binding data
             load_TFbinding(grn_dir, motif_weights, match_table, tf_names, element_names, output_dir)
@@ -639,7 +641,7 @@ def preprocess(
             # Load correlation between regulatory elements and target genes
             merged_s, merged_b = load_corr_RE_TG(gene_list, element_names, bulk_element_names, output_dir)
 
-            print('Generating the index file...')
+            logging.info('Generating the index file...')
             # Initialize output array
             output_array: np.ndarray = np.empty([len(gene_list), 4], dtype=object)
 
@@ -649,18 +651,18 @@ def preprocess(
                 output_array[i, :] = index_generate(selected_gene, merged_s, merged_b, tf_names)
 
             # Save the generated index to a file
-            pd.DataFrame(output_array).to_csv(output_dir + 'index.txt', sep='\t', header=None, index=None)
+            pd.DataFrame(output_array).to_csv(os.path.join(output_dir, 'index.txt'), sep='\t', header=None, index=None)
         
         else:
-            print("No matching genes found. Check input files.")
+            logging.info("No matching genes found. Check input files.")
 
     elif method == 'baseline':
-        print('Overlapping regions with bulk data...')
+        logging.info('Overlapping regions with bulk data...')
         # Simple region overlap using the 'baseline' method
         extract_overlap_regions(genome, grn_dir, output_dir, method, peak_file)
 
     else:
-        print(f"Method '{method}' not found! Please set method to 'baseline' or 'LINGER'.")
+        logging.info(f"Method '{method}' not found! Please set method to 'baseline' or 'LINGER'.")
 
 
 def get_adata(matrix: csc_matrix, features: pd.DataFrame, barcodes: pd.DataFrame, label: pd.DataFrame):
@@ -696,7 +698,7 @@ def get_adata(matrix: csc_matrix, features: pd.DataFrame, barcodes: pd.DataFrame
 
     # Create an AnnData object with the transposed matrix (cells as rows, features as columns)
     adata = anndata.AnnData(X=csc_matrix(matrix).T)
-    print(adata.shape)
+    logging.info(adata.shape)
     
     # Assign feature names (e.g., gene IDs or peak names) to the variable (features) metadata in AnnData
     adata.var['gene_ids'] = features[0].values
@@ -721,7 +723,7 @@ def get_adata(matrix: csc_matrix, features: pd.DataFrame, barcodes: pd.DataFrame
     adata_ATAC = adata[:, rows_to_select]
 
     ### If cell-type label (annotation) is provided, filter and annotate AnnData objects based on the label
-    print(label)
+    logging.info(label)
 
     # Filter RNA and ATAC data to keep only the barcodes present in the label
     idx: pd.Series = adata_RNA.obs['barcode'].isin(label['barcode_use'].values)

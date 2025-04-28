@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix, csc_matrix, coo_matrix
+from scipy.sparse import csr_matrix, coo_matrix, csc_matrix
 from tqdm import tqdm
 import torch
 import csv
@@ -10,6 +10,10 @@ import ast
 import scipy.sparse as sp
 from typing import List
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # Set seed for reproducibility
 hidden_size = 64
@@ -146,9 +150,6 @@ def list2mat(df: pd.DataFrame, i_n: str, j_n: str, x_n: str) -> tuple[np.ndarray
     # Convert DataFrame column values into arrays of corresponding row and column indices
     row_indices: np.ndarray = np.array([row_map[row] for row in df[i_n]])  # RE to row index
     col_indices: np.ndarray = np.array([col_map[col] for col in df[j_n]])  # TF to column index
-
-    # Import COO matrix from scipy.sparse for efficient sparse matrix creation
-    from scipy.sparse import coo_matrix
 
     # Create a sparse matrix where rows correspond to REs, columns to TFs, and values from the score column
     sparse_matrix = coo_matrix((df[x_n], (row_indices, col_indices)), shape=(len(REs), len(TFs)))
@@ -492,19 +493,19 @@ def load_region(
     """
 
     # Load overlapping regions from the BED file and merge the columns to form unique region strings
-    O_overlap: list[str] = merge_columns_in_bed_file(outdir + 'Region_overlap_' + chrN + '.bed', 1)
-    N_overlap: list[str] = merge_columns_in_bed_file(outdir + 'Region_overlap_' + chrN + '.bed', 4)
+    O_overlap: list[str] = merge_columns_in_bed_file(os.path.join(outdir, f'Region_overlap_{chrN}.bed', 1))
+    N_overlap: list[str] = merge_columns_in_bed_file(os.path.join(outdir, f'Region_overlap_{chrN}.bed', 4))
 
     # Get unique sets of overlapping and non-overlapping regions
     O_overlap_u: list[str] = list(set(O_overlap))  # Unique overlapping regions
     N_overlap_u: list[str] = list(set(N_overlap))  # Unique non-overlapping regions
 
     # Load hg19 peak regions and create DataFrame with indices for mapping
-    hg19_region: pd.DataFrame = merge_columns_in_bed_file(GRNdir + 'hg19_Peaks_' + chrN + '.bed', 1)
+    hg19_region: pd.DataFrame = merge_columns_in_bed_file(os.path.join(GRNdir, f'hg19_Peaks_{chrN}.bed', 1))
     hg19_region: pd.DataFrame = pd.DataFrame(range(len(hg19_region)), index=hg19_region)
 
     # Load hg38 peak regions and create DataFrame with indices for mapping
-    hg38_region: pd.DataFrame = merge_columns_in_bed_file(GRNdir + 'hg38_Peaks_' + chrN + '.bed', 1)
+    hg38_region: pd.DataFrame = merge_columns_in_bed_file(os.path.join(GRNdir, f'hg38_Peaks_{chrN}.bed', 1))
     hg38_region: pd.DataFrame = pd.DataFrame(range(len(hg38_region)), index=hg38_region)
 
     # Adjust overlap regions based on genome version
@@ -552,7 +553,7 @@ def load_TF_RE(
     """
 
     # Load the TF-RE interaction matrix for the given chromosome
-    mat: pd.DataFrame = pd.read_csv(GRNdir + 'Primary_TF_RE_' + chrN + '.txt', sep='\t', index_col=0)
+    mat: pd.DataFrame = pd.read_csv(os.path.join(GRNdir, f'Primary_TF_RE_{chrN}.txt'), sep='\t', index_col=0)
 
     # Initialize an empty matrix to store adjusted TF-RE interactions for unique overlaps
     mat1: np.ndarray = np.zeros([len(O_overlap_u), mat.shape[1]])
@@ -631,22 +632,22 @@ def TF_RE_LINGER_chr(chr: str, data_dir: str, outdir: str) -> pd.DataFrame:
     """
 
     # Read in the RE names
-    with open(data_dir+'/Peaks.txt', "r") as file:
+    with open(os.path.join(data_dir, 'Peaks.txt'), "r") as file:
         reader = csv.reader(file, delimiter='\t')
         first_column: list[str] = [row[0] for row in reader]
     REName: np.ndarray = np.array(first_column)
 
     # Read in the data0? file
-    data0: pd.DataFrame = pd.read_csv(f'{outdir}result_{chr}.txt', sep='\t')
+    data0: pd.DataFrame = pd.read_csv(os.path.join(outdir, f'result_{chr}.txt'), sep='\t')
     data0.columns = ['gene', 'x', 'y']
 
     # Read in the index file
-    idx: pd.DataFrame = pd.read_csv(outdir+'index.txt', sep='\t', header=None)
+    idx: pd.DataFrame = pd.read_csv(os.path.join(outdir, 'index.txt'), sep='\t', header=None)
     idx.columns = ['gene', 'REid', 'TF_id', 'REid_b']
     idx.fillna('', inplace=True)
 
     # Read in the TF names
-    TFName_df: pd.DataFrame = pd.read_csv(outdir+'TFName.txt', sep='\t', header=None)
+    TFName_df: pd.DataFrame = pd.read_csv(os.path.join(outdir, 'TFName.txt'), sep='\t', header=None)
     TFName_df.columns = ['Name']
     TFName: np.ndarray = TFName_df['Name'].values
 
@@ -655,10 +656,10 @@ def TF_RE_LINGER_chr(chr: str, data_dir: str, outdir: str) -> pd.DataFrame:
     REindex: np.ndarray = idx['REid'].values
 
     # Load the neural network data for the chromosome
-    net_all: torch.nn.Module = torch.load(outdir+"net_"+chr+".pt")
+    net_all: torch.nn.Module = torch.load(os.path.join(outdir, f'net_{chr}.pt'))
 
     # Read in the merged gene data
-    data_merge: pd.DataFrame = pd.read_csv(outdir+'data_merge.txt', sep='\t', header=0, index_col=0)
+    data_merge: pd.DataFrame = pd.read_csv(os.path.join(outdir, 'data_merge.txt'), sep='\t', header=0, index_col=0)
 
     # Filter the merged data to get genes for the current chromosome
     data_merge_temp: pd.Index = data_merge[data_merge['chr'] == chr].index
@@ -753,10 +754,6 @@ def TF_RE_binding_chr(
     # Load regions and their overlap information from the gene regulatory network data
     region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
 
-    # Import necessary libraries
-    import numpy as np
-    import pandas as pd
-
     # Create a DataFrame for target gene expression (TG) from the scRNA-seq data
     # The DataFrame target_gene_expression has genes as rows and barcodes (cells) as columns
     target_gene_expression = pd.DataFrame(
@@ -822,7 +819,7 @@ def TF_RE_binding(
     import numpy as np
     import pandas as pd
 
-    print('Generating cellular population TF binding strength ...')
+    logging.info('Generating cellular population TF binding strength ...')
     # List of chromosomes to process (1-22 and X)
     chrom = ['chr' + str(i + 1) for i in range(22)]
     chrom.append('chrX')
@@ -838,12 +835,12 @@ def TF_RE_binding(
             # Concatenate the result for the current chromosome to the overall result DataFrame
             result = pd.concat([result, out], join='outer', axis=0)
 
-        print('Generating cellular population TF binding strength for chrX')
+        logging.info('Generating cellular population TF binding strength for chrX')
         # Compute TF binding for chromosome X specifically
         chrN = 'chrX'
         out = TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, outdir)
         # Save the result for chromosome X to a file
-        out.to_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t')
+        out.to_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t')
         # Concatenate the result for chromosome X to the overall result DataFrame
         result = pd.concat([result, out], join='outer', axis=0)
 
@@ -869,7 +866,7 @@ def TF_RE_binding(
             mat = mat[TFoverlap]  # Filter the binding matrix to keep only the overlapping TFs
 
             # Save the result for the current chromosome to a file
-            mat.to_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t')
+            mat.to_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t')
             # Concatenate the result for the current chromosome to the overall result DataFrame
             result = pd.concat([result, mat], join='outer', axis=0)
 
@@ -878,7 +875,7 @@ def TF_RE_binding(
         Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
         # Load RE-TG link information from the file and set appropriate column names
-        RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
+        RE_TGlink = pd.read_csv(os.path.join(outdir, 'RE_TGlink.txt'), sep='\t', header=0)
         RE_TGlink.columns = ['RE', 'gene', 'distance']  # Adjust the columns based on the dataset structure
 
         RE_TGlink['chr'] = RE_TGlink['RE'].apply(lambda x: x.split(':')[0])
@@ -900,13 +897,13 @@ def TF_RE_binding(
             RE_TGlink_chr = RE_TGlink[RE_TGlink['chr'] == chrtemp]
 
             # Load the pre-trained neural network model for the current chromosome
-            net_all = torch.load(outdir + str(chrtemp) + '_net.pt')
+            net_all = torch.load(os.path.join(outdir, f'{str(chrtemp)}_net.pt'))
 
             # Compute TF binding using scNN method for the current chromosome
             result = TF_RE_scNN(TFName, geneName, net_all, RE_TGlink_chr, REName)
 
             # Save the result for the current chromosome to a file
-            result.to_csv(outdir + chrtemp + '_cell_population_TF_RE_binding.txt', sep='\t')
+            result.to_csv(os.path.join(outdir, f'{chrtemp}_cell_population_TF_RE_binding.txt'), sep='\t')
 
             # Concatenate the result for the current chromosome to the overall result DataFrame
             result_all = pd.concat([result_all, result], axis=0)
@@ -915,7 +912,7 @@ def TF_RE_binding(
         result = result_all.copy()
 
         # Save the final concatenated result for all chromosomes to a file
-        result.to_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t')
+        result.to_csv(os.path.join(outdir, 'cell_population_TF_RE_binding.txt'), sep='\t')
         
 
 def cell_type_specific_TF_RE_binding_chr(
@@ -959,10 +956,6 @@ def cell_type_specific_TF_RE_binding_chr(
     # Load regions and their overlap information from the gene regulatory network data
     region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
 
-    # Import necessary libraries
-    import numpy as np
-    import pandas as pd
-
     # Extract cell type labels and create a list of unique labels
     cell_labels = scRNA_data.obs['label'].values.tolist()
     unique_cell_labels = list(set(cell_labels))
@@ -971,7 +964,7 @@ def cell_type_specific_TF_RE_binding_chr(
     try:
         atac_cell_type_average = scATAC_data.X[np.array(cell_labels) == cell_type, :].mean(axis=0)
     except ZeroDivisionError:
-        print(f'No cells with cell type "{cell_type}". Check selected cell type name in "shared_variables.py"')
+        logging.info(f'No cells with cell type "{cell_type}"')
 
     regulatory_element_accessibility = pd.DataFrame(atac_cell_type_average.T, index=scATAC_data.var['gene_ids'].values, columns=['values'])
 
@@ -1142,14 +1135,14 @@ def cell_type_specific_TF_RE_binding(
     if (celltype == 'all') & (method != 'scNN'):
         # Iterate over each unique cell label
         for label0 in labelset:
-            print(f'Generate cell type-specific TF binding potential for cell type {label0}...')
+            logging.info(f'Generate cell type-specific TF binding potential for cell type {label0}...')
             result = pd.DataFrame()
 
             # Iterate over chromosomes 1-22
             for i in range(22):
                 chrN = 'chr' + str(i + 1)
                 # Read the cell population TF-RE binding matrix for the chromosome
-                mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
+                mat = pd.read_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
                 # Call the function for chromosome-specific binding
                 out = cell_type_specific_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, label0, outdir, method, mat)
                 # Concatenate results
@@ -1157,12 +1150,12 @@ def cell_type_specific_TF_RE_binding(
 
             # Handle chromosome X
             chrN = 'chrX'
-            mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
+            mat = pd.read_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
             out = cell_type_specific_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, label0, outdir, method, mat)
             result = pd.concat([result, out], join='outer', axis=0).fillna(0)
 
             # Save the result for the current cell type
-            result.to_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(label0) + '.txt', sep='\t')
+            result.to_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(label0)}.txt'), sep='\t')
 
     # If the method is not 'scNN' and a specific celltype is given
     elif method != 'scNN':
@@ -1173,16 +1166,16 @@ def cell_type_specific_TF_RE_binding(
         # Iterate over all chromosomes
         for i in range(23):
             chrN = chrom[i]
-            mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
+            mat = pd.read_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
             out = cell_type_specific_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, celltype, outdir, method, mat)
             result = pd.concat([result, out], join='outer', axis=0)
 
         # Save the result for the specified cell type
-        result.to_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(celltype) + '.txt', sep='\t')
+        result.to_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(celltype)}.txt'), sep='\t')
 
     # If 'scNN' method is used and all cell types should be processed
     elif (celltype == 'all') & (method == 'scNN'):
-        A = pd.read_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t', header=0, index_col=0)
+        A = pd.read_csv(os.path.join(outdir, 'cell_population_TF_RE_binding.txt'), sep='\t', header=0, index_col=0)
         mat, REs, TFs = list2mat(A, 'RE', 'TF', 'score')
         mat = pd.DataFrame(mat, index=REs, columns=TFs)
 
@@ -1212,7 +1205,7 @@ def cell_type_specific_TF_RE_binding(
 
         # Iterate over all cell types and compute the binding potential
         for label0 in labelset:
-            print(f'Generate cell type-specific TF binding potential for cell type {label0}...')
+            logging.info(f'Generate cell type-specific TF binding potential for cell type {label0}...')
 
             # Compute average values for RNA and ATAC data for the current cell type
             temp = adata_ATAC.X[np.array(label) == label0, :].mean(axis=0).T
@@ -1226,12 +1219,12 @@ def cell_type_specific_TF_RE_binding(
             result = cell_type_specific_TF_RE_binding_score_scNN(mat, TFbinding, RE, TG, TFoverlap)
 
             # Save results
-            result.to_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(label0) + '.txt', sep='\t')
+            result.to_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(label0)}.txt'), sep='\t')
 
     # If 'scNN' method and specific cell type is provided
     else:
         label0 = celltype
-        A = pd.read_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t', header=0, index_col=0)
+        A = pd.read_csv(os.path.join(outdir, 'cell_population_TF_RE_binding.txt'), sep='\t', header=0, index_col=0)
         mat, REs, TFs = list2mat(A, 'RE', 'TF', 'score')
         mat = pd.DataFrame(mat, index=REs, columns=TFs)
 
@@ -1254,7 +1247,7 @@ def cell_type_specific_TF_RE_binding(
         TFbinding1 = pd.DataFrame(TFbinding1, index=mat.index, columns=TFoverlap)
         TFbinding = TFbinding1.copy()
 
-        print(f'Generate cell type-specific TF binding potential for cell type {label0}...')
+        logging.info(f'Generate cell type-specific TF binding potential for cell type {label0}...')
 
         # Compute average values for RNA and ATAC data for the specific cell type
         temp = adata_ATAC.X[np.array(label) == label0, :].mean(axis=0).T
@@ -1267,7 +1260,7 @@ def cell_type_specific_TF_RE_binding(
         result = cell_type_specific_TF_RE_binding_score_scNN(mat, TFbinding, RE, TG, TFoverlap)
 
         # Save results
-        result.to_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(label0) + '.txt', sep='\t')
+        result.to_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(label0)}.txt'), sep='\t')
 
 
 def cell_level_TF_RE_binding_chr(
@@ -1308,10 +1301,6 @@ def cell_level_TF_RE_binding_chr(
         pd.DataFrame:
             A DataFrame containing the maximum binding score for each regulatory element for the given cell.
     """
-
-    # Import necessary libraries
-    import numpy as np
-    import pandas as pd
 
     # Extract cell names and check if the specified cell exists
     cell_names = scRNA_data.obs_names  # Assuming the cell names are stored as obs_names in the AnnData object
@@ -1398,8 +1387,8 @@ def cell_level_TF_RE_binding_chr(
     
     # # Ensure unique indices before concatenation
     # result = result.reset_index(drop=True, inplace=True)  # Reset index if necessary
-    # print(result.head())
-    # print(result.shape)
+    # logging.info(result.head())
+    # logging.info(result.shape)
     
     # Ensure that the gene names (transcription factors) remain as columns
     max_binding_scores.columns = overlapping_tfs  # Explicitly set column names to the overlapping TFs
@@ -1442,7 +1431,7 @@ def cell_level_TF_RE_binding(
 
     # Iterate over specific cells in the 'cells' list
     for cell_name in cells:
-        print(f'Processing {cell_name}...')
+        logging.info(f'Processing {cell_name}...')
 
         result = pd.DataFrame()
 
@@ -1450,8 +1439,8 @@ def cell_level_TF_RE_binding(
         chrom = ['chr' + str(i + 1) for i in range(22)] + ['chrX']
 
         for chrN in chrom:
-            print(f'\tChr {chrN}')
-            mat = pd.read_csv(outdir + chrN + '_cell_population_TF_RE_binding.txt', sep='\t', index_col=0, header=0)
+            logging.info(f'\tChr {chrN}')
+            mat = pd.read_csv(os.path.join(outdir, f'{chrN}_cell_population_TF_RE_binding.txt'), sep='\t', index_col=0, header=0)
             
             # Call the function to compute binding potentials for the current chromosome
             out = cell_level_TF_RE_binding_chr(adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat)
@@ -1463,7 +1452,7 @@ def cell_level_TF_RE_binding(
             os.makedirs(cell_outdir)
 
         # Save the results for the current cell
-        result.to_csv(os.path.join(cell_outdir, f'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
+        result.to_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
 
 def load_shapley(chr: str, data_dir: str, outdir: str):
     """
@@ -1490,16 +1479,16 @@ def load_shapley(chr: str, data_dir: str, outdir: str):
     """
     
     # Load the Shapley value tensor for the specified chromosome
-    shap_all = torch.load(f'{outdir}shap_{chr}.pt')
+    shap_all = torch.load(os.path.join(outdir, 'shap_{chr}.pt'))
 
     # Load RE names from the Peaks.txt file
-    REName_file = f'{data_dir}/Peaks.txt'
+    REName_file = os.path.join(data_dir, 'Peaks.txt')
     with open(REName_file, "r") as file:
         reader = csv.reader(file, delimiter='\t')
         REName = np.array([row[0] for row in reader])
 
     # Load index file containing gene, TF, and RE information
-    idx_file = f'{outdir}index.txt'
+    idx_file = os.path.join(outdir, 'index.txt')
     idx = pd.read_csv(idx_file, sep='\t', header=None)
     idx.columns = ['gene', 'REid', 'TF_id', 'REid_b']
     idx.fillna('', inplace=True)
@@ -1510,12 +1499,12 @@ def load_shapley(chr: str, data_dir: str, outdir: str):
     TFindex = idx['TF_id'].values
 
     # Load transcription factor names from the TFName.txt file
-    TFName_file = f'{outdir}TFName.txt'
+    TFName_file = os.path.join(outdir, 'TFName.txt')
     TFName = pd.read_csv(TFName_file, sep='\t', header=None)
     TFName = TFName[0].values
 
     # Load merged data and filter it for the specified chromosome
-    data_merge_file = f'{outdir}data_merge.txt'
+    data_merge_file = os.path.join(outdir, 'data_merge.txt')
     data_merge = pd.read_csv(data_merge_file, sep='\t', header=0, index_col=0)
     data_merge_temp = data_merge[data_merge['chr'] == chr]
 
@@ -1703,10 +1692,8 @@ def load_RE_TG(
             2. A NumPy array representing the unique target genes (TGs).
     """
 
-    from scipy.sparse import coo_matrix
-
     # Load the RE-TG interaction data for the specified chromosome
-    primary_s: pd.DataFrame = pd.read_csv(GRNdir + 'Primary_RE_TG_' + chrN + '.txt', sep='\t')
+    primary_s: pd.DataFrame = pd.read_csv(os.path.join(GRNdir, f'Primary_RE_TG_{chrN}.txt'), sep='\t')
 
     # Convert RE column into "chr:start-end" format to match O_overlap_u
     primary_s["RE"] = primary_s["RE"].apply(lambda x: x.split('_')[0] + ':' + x.split('_')[1] + '-' + x.split('_')[2])
@@ -1798,10 +1785,8 @@ def load_RE_TG_distance(
             A DataFrame representing the RE-TG distance matrix, where rows correspond to overlapping regions (REs) 
             and columns correspond to target genes (TGs), with transformed distance values.
     """
-    from scipy.sparse import coo_matrix
-
     # Load the RE-TG distance data for the specified chromosome
-    Dis: pd.DataFrame = pd.read_csv(GRNdir + 'RE_TG_distance_' + chrN + '.txt', sep='\t', header=None)
+    Dis: pd.DataFrame = pd.read_csv(os.path.join(GRNdir, f'RE_TG_distance_{chrN}.txt'), sep='\t', header=None)
     
     # Set column names for the distance DataFrame
     Dis.columns = ['RE', 'TG', 'dis']
@@ -1887,7 +1872,7 @@ def load_RE_TG_scNN(outdir: str) -> tuple[np.ndarray, np.ndarray, list[str], lis
     """
 
     # Load the RE-TG distance data
-    dis: pd.DataFrame = pd.read_csv(f'{outdir}/RE_gene_distance.txt', sep='\t', header=0)
+    dis: pd.DataFrame = pd.read_csv(os.path.join(outdir, 'RE_gene_distance.txt'), sep='\t', header=0)
 
     # Apply exponential decay transformation to the distance values
     dis['distance'] = np.exp(-(0.5 + dis['distance'] / 25000))
@@ -1897,7 +1882,7 @@ def load_RE_TG_scNN(outdir: str) -> tuple[np.ndarray, np.ndarray, list[str], lis
     TGs: np.ndarray = dis['gene'].unique()
 
     # Load the cis-regulatory interaction data
-    cis: pd.DataFrame = pd.read_csv(outdir + 'cell_population_cis_regulatory.txt', sep='\t', header=None)
+    cis: pd.DataFrame = pd.read_csv(os.path.join(outdir, 'cell_population_cis_regulatory.txt'), sep='\t', header=None)
     cis.columns = ['RE', 'TG', 'score']
 
     # Get unique REs and TGs from the cis-regulatory data
@@ -2072,7 +2057,7 @@ def cis_shap_scNN(
     score_2: list[float] = []
 
     # Load the pre-computed Shapley values from the PyTorch file
-    shap_all = torch.load(outdir + chrtemp + "_shap" + ".pt")
+    shap_all = torch.load(os.path.join(outdir, f'{chrtemp}_shap.pt'))
 
     # Get the total number of RE-TG link rows
     N: int = RE_TGlink1.shape[0]
@@ -2184,7 +2169,7 @@ def cis_reg(
         Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
         # Load the RE-TG link data from a file
-        RE_TGlink = pd.read_csv(outdir + 'RE_TGlink.txt', sep='\t', header=0)
+        RE_TGlink = pd.read_csv(os.path.join(outdir, 'RE_TGlink.txt'), sep='\t', header=0)
         RE_TGlink.columns = [0, 1, 'chr']  # Set the column names
 
         # Get the list of unique chromosomes in the RE-TG link data
@@ -2203,14 +2188,10 @@ def cis_reg(
             result = pd.concat([result, temp], axis=0, join='outer')  # Concatenate the results
 
     # Save the final result to a file
-    result.to_csv(outdir + 'cell_population_cis_regulatory.txt', sep='\t', header=None, index=None)
+    result.to_csv(os.path.join(outdir, 'cell_population_cis_regulatory.txt'), sep='\t', header=None, index=None)
 
 
 def cell_type_specific_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,celltype,outdir): 
-    import numpy as np
-    import pandas as pd
-    from scipy.sparse import csc_matrix
-    from scipy.sparse import coo_matrix
     O_overlap, N_overlap,O_overlap_u,N_overlap_u,O_overlap_hg19_u=load_region(GRNdir,genome,chrN,outdir)
     sparse_S,TGset=load_RE_TG(GRNdir,chrN,O_overlap_u,O_overlap_hg19_u,O_overlap)
     label=adata_RNA.obs['label'].values.tolist()
@@ -2257,10 +2238,6 @@ def cell_type_specific_cis_reg_chr(GRNdir,adata_RNA,adata_ATAC,genome,chrN,cellt
 def cell_level_cis_reg_chr(
     GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir
 ):
-    import numpy as np
-    import pandas as pd
-    from scipy.sparse import csc_matrix, coo_matrix
-
     # Load region and regulatory element data
     O_overlap, N_overlap, O_overlap_u, N_overlap_u, O_overlap_hg19_u = load_region(GRNdir, genome, chrN, outdir)
     sparse_S, TGset = load_RE_TG(GRNdir, chrN, O_overlap_u, O_overlap_hg19_u, O_overlap)
@@ -2358,16 +2335,13 @@ def cell_level_cis_reg(
             The function saves the cis-regulatory results to a text file for each individual cell.
     """
 
-    import pandas as pd
-    import numpy as np
-
     # List of chromosome names ('chr1' to 'chr22' and 'chrX')
     chrom = ['chr' + str(i + 1) for i in range(22)]
     chrom.append('chrX')
 
     # Iterate over the specific cells
     for cell_name in cell_names:
-        print(f"Processing cell {cell_name}...")
+        logging.info(f"Processing cell {cell_name}...")
 
         # Initialize an empty DataFrame to store results for the current cell
         result = pd.DataFrame([])
@@ -2389,7 +2363,7 @@ def cell_level_cis_reg(
             os.makedirs(cell_outdir)
         
         # Save the results for the current cell
-        result.to_csv(cell_outdir + 'cell_specific_cis_regulatory.txt', sep='\t', header=None, index=None)
+        result.to_csv(os.path.join(cell_outdir, 'cell_specific_cis_regulatory.txt'), sep='\t', header=None, index=None)
 
 
 def cell_type_specific_cis_reg_scNN(
@@ -2503,9 +2477,6 @@ def cell_type_specific_cis_reg(
             The function saves the cis-regulatory results to a text file for each cell type or the selected cell type.
     """
 
-    import pandas as pd
-    import numpy as np
-
     # Extract the labels (cell types) from the RNA-seq data
     label = adata_RNA.obs['label'].values.tolist()
     labelset = list(set(label))
@@ -2532,7 +2503,7 @@ def cell_type_specific_cis_reg(
             result = pd.concat([result, temp], axis=0, join='outer')
 
             # Save the results to a file
-            result.to_csv(outdir + 'cell_type_specific_cis_regulatory_' + str(label0) + '.txt', sep='\t', header=None, index=None)
+            result.to_csv(os.path.join(outdir, f'cell_type_specific_cis_regulatory_{str(label0)}.txt'), sep='\t', header=None, index=None)
 
     # If analyzing a specific cell type using a method other than 'scNN'
     elif method != 'scNN':
@@ -2550,7 +2521,7 @@ def cell_type_specific_cis_reg(
         result = pd.concat([result, temp], axis=0, join='outer')
 
         # Save the results to a file
-        result.to_csv(outdir + 'cell_type_specific_cis_regulatory_' + celltype + '.txt', sep='\t', header=None, index=None)
+        result.to_csv(os.path.join(outdir, f'cell_type_specific_cis_regulatory_{celltype}.txt'), sep='\t', header=None, index=None)
 
     # If analyzing all cell types using the 'scNN' method
     elif (celltype == 'all') & (method == 'scNN'):
@@ -2574,7 +2545,7 @@ def cell_type_specific_cis_reg(
             result = cell_type_specific_cis_reg_scNN(distance, cisGRN, RE, TG, REs, TGs)
 
             # Save the results to a file
-            result.to_csv(outdir + 'cell_type_specific_cis_regulatory_' + label0 + '.txt', sep='\t', header=None, index=None)
+            result.to_csv(os.path.join(outdir, f'cell_type_specific_cis_regulatory_{label0}.txt'), sep='\t', header=None, index=None)
 
     # If analyzing a specific cell type using the 'scNN' method
     else:
@@ -2595,7 +2566,7 @@ def cell_type_specific_cis_reg(
         result = cell_type_specific_cis_reg_scNN(distance, cisGRN, RE, TG, REs, TGs)
 
         # Save the results to a file
-        result.to_csv(outdir + 'cell_type_specific_cis_regulatory_' + label0 + '.txt', sep='\t', header=None, index=None)
+        result.to_csv(os.path.join(outdir, f'cell_type_specific_cis_regulatory_{label0}.txt'), sep='\t', header=None, index=None)
 
 
 def trans_shap_scNN(
@@ -2626,11 +2597,6 @@ def trans_shap_scNN(
             A DataFrame where rows are target genes (TGs) and columns are transcription factors (TFs). The values represent the Shapley scores indicating the strength of regulation.
     """
 
-    import ast
-    import numpy as np
-    import pandas as pd
-    import torch
-
     # Initialize lists to store target genes (TG), transcription factors (TF), and their Shapley scores
     TG_1: list[str] = []
     TF_1: list[str] = []
@@ -2640,7 +2606,7 @@ def trans_shap_scNN(
     REName = pd.DataFrame(range(len(REName)), index=REName)
 
     # Load the pre-computed Shapley values for the given chromosome
-    shap_all = torch.load(outdir + chrtemp + "_shap" + ".pt")
+    shap_all = torch.load(os.path.join(outdir, f'{chrtemp}_shap.pt'))
 
     # Get the total number of RE-TG links
     N = RE_TGlink1.shape[0]
@@ -2716,18 +2682,13 @@ def load_cis(
             A DataFrame representing the cis-regulatory interaction matrix, where rows are REs and columns are TGs. 
             The values represent the cis-regulatory interaction scores.
     """
-
-    from scipy.sparse import coo_matrix
-    import pandas as pd
-    import numpy as np
-
     # Load the appropriate cis-regulatory data file based on the cell type
     if celltype == '':
         # Load population-level cis-regulatory data if no specific cell type is provided
-        cis = pd.read_csv(outdir + 'cell_population_cis_regulatory.txt', sep='\t', header=None)
+        cis = pd.read_csv(os.path.join(outdir, 'cell_population_cis_regulatory.txt'), sep='\t', header=None)
     else:
         # Load cell-type-specific cis-regulatory data for the specified cell type
-        cis = pd.read_csv(outdir + 'cell_type_specific_cis_regulatory_' + celltype + '.txt', sep='\t', header=None)
+        cis = pd.read_csv(os.path.join(outdir, f'cell_type_specific_cis_regulatory_{celltype}.txt'), sep='\t', header=None)
 
     # Set column names for the cis-regulatory DataFrame
     cis.columns = ['RE', 'TG', 'Score']
@@ -2789,13 +2750,8 @@ def load_cell_specific_cis(
             A DataFrame representing the cis-regulatory interaction matrix, where rows are REs and columns are TGs. 
             The values represent the cis-regulatory interaction scores.
     """
-
-    from scipy.sparse import coo_matrix
-    import pandas as pd
-    import numpy as np
-
     # Load cell-level cis-regulatory data if no specific cell type is provided
-    cis = pd.read_csv(outdir + 'cell_specific_cis_regulatory.txt', sep='\t', header=None)
+    cis = pd.read_csv(os.path.join(outdir, 'cell_specific_cis_regulatory.txt'), sep='\t', header=None)
 
     # Set column names for the cis-regulatory DataFrame
     cis.columns = ['RE', 'TG', 'Score']
@@ -2942,12 +2898,12 @@ def trans_reg(
             The function saves the trans-regulatory network to a text file in the specified output directory.
     """
 
-    print('Generate trans-regulatory network ...')
+    logging.info('Generate trans-regulatory network ...')
 
     # If the selected method is 'baseline', calculate the trans-regulatory network using cis-regulation and TF-TG data
     if method == 'baseline':
         # Load binding data between TFs and REs
-        Binding = pd.read_csv(outdir + 'cell_population_TF_RE_binding.txt', sep='\t', index_col=0)
+        Binding = pd.read_csv(os.path.join(outdir, 'cell_population_TF_RE_binding.txt'), sep='\t', index_col=0)
 
         # Load cis-regulatory data for the population
         cis = load_cis(Binding, '', outdir)
@@ -2976,7 +2932,7 @@ def trans_reg(
 
         # Iterate over all chromosomes
         for i in range(23):
-            print(f'Chr {i + 1} / 23')
+            logging.info(f'Chr {i + 1} / 23')
 
             # Get the chromosome name
             chrN = chrom[i]
@@ -2993,7 +2949,7 @@ def trans_reg(
         Exp, Opn, Target, RE_TGlink = load_data_scNN(GRNdir, outdir, data_dir, genome)
 
         # Load the RE-TG link data
-        RE_TGlink = pd.read_csv(outdir + 'RE_gene_distance.txt', sep='\t', header=0)
+        RE_TGlink = pd.read_csv(os.path.join(outdir, 'RE_gene_distance.txt'), sep='\t', header=0)
         RE_TGlink.columns = [0, 1, 'chr']  # Set the column names
 
         # Get the list of unique chromosomes from the RE-TG link data
@@ -3023,8 +2979,8 @@ def trans_reg(
             S = pd.concat([S, temp], axis=0, join='outer')
 
     # Save the final trans-regulatory network to a file
-    print('Saving trans-regulatory network ...')
-    trans_reg_net.to_csv(outdir + 'cell_population_trans_regulatory.txt', sep='\t')
+    logging.info('Saving trans-regulatory network ...')
+    trans_reg_net.to_csv(os.path.join(outdir, 'cell_population_trans_regulatory.txt'), sep='\t')
 
 
 def cell_type_specific_trans_reg(
@@ -3062,7 +3018,7 @@ def cell_type_specific_trans_reg(
     if celltype == 'all':
         for label0 in labelset:  # Iterate over all cell types
             # Load cell-type-specific TF-RE binding data for the current cell type
-            Binding = pd.read_csv(outdir + 'cell_type_specific_TF_RE_binding_' + str(label0) + '.txt', sep='\t', index_col=0)
+            Binding = pd.read_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(label0)}.txt'), sep='\t', index_col=0)
 
             label0 = str(label0)
 
@@ -3080,12 +3036,12 @@ def cell_type_specific_trans_reg(
             S = pd.DataFrame(S, index=TGset, columns=TFset)
 
             # Save the trans-regulatory network for the current cell type to a file
-            S.to_csv(outdir + 'cell_type_specific_trans_regulatory_' + str(label0) + '.txt', sep='\t')
+            S.to_csv(os.path.join(outdir, f'cell_type_specific_trans_regulatory_{str(label0)}.txt'), sep='\t')
 
     # If computing for a specific cell type
     else:
         # Load cell-type-specific TF-RE binding data for the specified cell type
-        Binding = pd.read_csv(outdir + 'cell_type_specific_TF_RE_binding_' + celltype + '.txt', sep='\t', index_col=0)
+        Binding = pd.read_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{celltype}.txt'), sep='\t', index_col=0)
 
         # Load the cis-regulatory network for the specified cell type
         cis = load_cis(Binding, celltype, outdir)
@@ -3101,7 +3057,7 @@ def cell_type_specific_trans_reg(
         S = pd.DataFrame(S, index=TGset, columns=TFset)
 
         # Save the trans-regulatory network for the specified cell type to a file
-        S.to_csv(outdir + 'cell_type_specific_trans_regulatory_' + celltype + '.txt', sep='\t')
+        S.to_csv(os.path.join(outdir, f'cell_type_specific_trans_regulatory_{celltype}.txt'), sep='\t')
 
 
 def cell_level_trans_reg(
@@ -3136,7 +3092,7 @@ def cell_level_trans_reg(
             os.makedirs(cell_outdir)
             
         # Load cell-type-specific TF-RE binding data for the current cell type
-        Binding = pd.read_csv(cell_outdir + 'cell_specific_TF_RE_binding' + '.txt', sep='\t', index_col=0)
+        Binding = pd.read_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index_col=0)
 
         # Load the cis-regulatory network for the current cell type
         cis = load_cell_specific_cis(Binding, cell_outdir)
@@ -3152,7 +3108,7 @@ def cell_level_trans_reg(
         S = pd.DataFrame(S, index=TGset, columns=TFset)
 
         # Save the trans-regulatory network for the current cell type to a file
-        S.to_csv(cell_outdir + 'cell_specific_trans_regulatory' + '.txt', sep='\t')
+        S.to_csv(os.path.join(cell_outdir, 'cell_specific_trans_regulatory.txt'), sep='\t')
 
 def TF_RE_scNN(
     TFName: np.ndarray, 
@@ -3305,27 +3261,27 @@ def load_data_scNN(
     """
 
     # Load genome mapping file to map genome identifiers to species
-    genome_map = pd.read_csv(GRNdir + 'genome_map_homer.txt', sep='\t', header=0)
+    genome_map = pd.read_csv(os.path.join(GRNdir, 'genome_map_homer.txt'), sep='\t', header=0)
     genome_map.index = genome_map['genome_short'].values  # Set genome_short as the index for easy lookup
 
     # Load transcription factor (TF) to motif matching data based on the selected genome's species
-    Match2 = pd.read_csv(GRNdir + 'Match_TF_motif_' + genome_map.loc[genome]['species_ensembl'] + '.txt', sep='\t', header=0)
+    Match2 = pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{genome_map.loc[genome]["species_ensembl"]}.txt'), sep='\t', header=0)
 
     # Extract unique TF names from the matching data
     TFName = pd.DataFrame(Match2['TF'].unique())
 
     # Load target gene expression data from pseudobulk RNA-seq data
-    Target = pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Target = pd.read_csv(os.path.join(data_dir, 'TG_pseudobulk.tsv'), sep=',', header=0, index_col=0)
 
     # Filter target genes to keep only those that overlap with the TF names
     TFlist = list(set(Target.index) & set(TFName[0].values))  # Get overlapping genes
     Exp = Target.loc[TFlist]  # Filter expression data for these TFs
 
     # Load open chromatin data (regulatory elements, REs) from pseudobulk ATAC-seq data
-    Opn = pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Opn = pd.read_csv(os.path.join(data_dir, 'RE_pseudobulk.tsv'), sep=',', header=0, index_col=0)
 
     # Load RE-TG link data (links regulatory elements to target genes based on distance)
-    RE_TGlink = pd.read_csv(f'{outdir}RE_TGlink.txt', sep='\t', header=0)
+    RE_TGlink = pd.read_csv(os.path.join(outdir, 'RE_TGlink.txt'), sep='\t', header=0)
 
     # Group REs by target genes and convert to a list of REs for each gene
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()
@@ -3366,17 +3322,17 @@ def load_TFbinding_scNN(
     """
 
     # Load genome mapping file to map genome identifiers to species (e.g., Ensembl species name)
-    genome_map = pd.read_csv(GRNdir + 'genome_map_homer.txt', sep='\t', header=0)
+    genome_map = pd.read_csv(os.path.join(GRNdir, 'genome_map_homer.txt'), sep='\t', header=0)
     genome_map.index = genome_map['genome_short'].values  # Set genome_short as the index for easy lookup
 
     # Load motif binding data from the 'MotifTarget.bed' file
-    A = pd.read_csv(outdir + 'MotifTarget.bed', sep='\t', header=0, index_col=None)
+    A = pd.read_csv(os.path.join(outdir, 'MotifTarget.bed'), sep='\t', header=0, index_col=None)
 
     # Apply logarithmic transformation to the MotifScore column for normalization
     A['MotifScore'] = np.log(1 + A['MotifScore'])
 
     # Load motif-TF matching data for the selected genome
-    Match2 = pd.read_csv(GRNdir + 'Match_TF_motif_' + genome_map.loc[genome]['species_ensembl'] + '.txt', sep='\t', header=0)
+    Match2 = pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{genome_map.loc[genome]["species_ensembl"]}.txt'), sep='\t', header=0)
 
     # Convert the motif binding data into a matrix where rows are REs, columns are motifs, and values are motif scores
     # The 'list2mat' function creates a matrix where 'PositionID' is used for REs, 'Motif Name' for motifs, and 'MotifScore' for the values

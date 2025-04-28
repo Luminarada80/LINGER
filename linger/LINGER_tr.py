@@ -6,12 +6,15 @@ import numpy as np
 import pandas as pd
 from torch.optim import Adam
 import os
-from tqdm import tqdm
 import warnings
 import pandas as pd
 import numpy as np
 import shap
 import pybedtools
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 hidden_size = 64
 hidden_size2 = 16
@@ -525,7 +528,7 @@ def get_TSS(GRNdir: str, genome: str, TSS_dis: int, output_dir: str) -> None:
 
     # Load the TSS data from the specified directory and file
     import pandas as pd
-    Tssdf = pd.read_csv(GRNdir + 'TSS_' + genome + '.txt', sep='\t', header=None)
+    Tssdf = pd.read_csv(os.path.join(GRNdir, f'TSS_{genome}.txt'), sep='\t', header=None)
 
     # Assign column names to the loaded DataFrame
     Tssdf.columns = ['chr', 'TSS', 'symbol', 'strand']
@@ -585,9 +588,9 @@ def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.nd
 
     # Load data for chromosomes 1-22
     for i in range(22):
-        print(f'Loading data for chromosome {i+1} / 22')
+        logging.info(f'Loading data for chromosome {i+1} / 22')
         chr = 'chr' + str(i+1)
-        gene_file = GRNdir + chr + '_gene.txt'
+        gene_file = os.path.join(GRNdir, f'{chr}_gene.txt')
         # Load the gene data and add chromosome and id information
         data0 = pd.read_csv(gene_file, sep='\t', header=None, names=['gene'])
         data0['chr'] = chr
@@ -596,7 +599,7 @@ def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.nd
 
     # Load data for chromosome X
     chr = 'chrX'
-    gene_file = GRNdir + chr + '_gene.txt'
+    gene_file = os.path.join(GRNdir, f'{chr}_gene.txt')
     data0 = pd.read_csv(gene_file, sep='\t', header=None, names=['gene'])
     data0['chr'] = chr
     data0['id_b'] = data0.index + 1
@@ -607,10 +610,10 @@ def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.nd
         gene_all = gene_all[['gene', 'chr', 'id_b']]
         gene_all.columns = ['Symbol', 'chr', 'id_b']
     else:
-        print(f"Warning: gene_all has unexpected columns: {gene_all.columns}")
+        logging.info(f"Warning: gene_all has unexpected columns: {gene_all.columns}")
 
     # Load the Symbol.txt file and merge with gene data
-    gene_file = outdir + 'Symbol.txt'
+    gene_file = os.path.join(outdir, f'Symbol.txt')
     data0 = pd.read_csv(gene_file, sep='\t', header=None)
     data0.columns = ['Symbol']
     data0['id_s'] = data0.index + 1
@@ -618,8 +621,8 @@ def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.nd
     data_merge = pd.merge(data0, gene_all, how='left', on='Symbol')
 
     # Load and merge transcription factor (TF) names from GRN and output directories
-    TFName_b = pd.read_csv(GRNdir + 'TFName.txt', header=None, sep='\t')
-    TFName_s = pd.read_csv(outdir + 'TFName.txt', header=None, sep='\t')
+    TFName_b = pd.read_csv(os.path.join(GRNdir, 'TFName.txt'), header=None, sep='\t')
+    TFName_s = pd.read_csv(os.path.join(outdir, 'TFName.txt'), header=None, sep='\t')
     TFName_b.columns = ['TF']
     TFName_s.columns = ['TF']
     TFName_b['id_b'] = TFName_b.index + 1  # Index from 1
@@ -627,15 +630,15 @@ def load_data(GRNdir: str, outdir: str) -> tuple[np.ndarray, pd.DataFrame, np.nd
     TF_match = pd.merge(TFName_s, TFName_b, how='left', on='TF')
 
     # Load openness, index, and target gene expression data
-    Opn_file = outdir + 'Openness.txt'
-    idx_file = outdir + 'index.txt'
-    geneexp_file = outdir + 'Exp.txt'
+    Opn_file = os.path.join(outdir, 'Openness.txt')
+    idx_file = os.path.join(outdir, 'index.txt')
+    geneexp_file = os.path.join(outdir, 'Exp.txt')
     Target = pd.read_csv(geneexp_file, header=None, sep='\t').values
 
     # Load TF binding and expression data
-    bind_file = outdir + 'TF_binding.txt'
+    bind_file = os.path.join(outdir, 'TF_binding.txt')
     adj_matrix_all = pd.read_csv(bind_file, header=None, sep='\t').values
-    TFExp_file = outdir + 'TFexp.txt'
+    TFExp_file = os.path.join(outdir, 'TFexp.txt')
     Opn = pd.read_csv(Opn_file, header=None, sep='\t').values
     idx = pd.read_csv(idx_file, header=None, sep='\t')
     Exp = pd.read_csv(TFExp_file, header=None, sep='\t').values
@@ -796,13 +799,13 @@ def load_data_scNN(GRNdir: str, species: str, data_dir: str) -> tuple[pd.DataFra
     import pandas as pd
 
     # Load the TF-motif matching file based on the species
-    Match2 = pd.read_csv(GRNdir + 'Match_TF_motif_' + species + '.txt', header=0, sep='\t')
+    Match2 = pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{species}.txt'), header=0, sep='\t')
     
     # Extract unique transcription factors (TFs) from the Match2 file
     TFName = pd.DataFrame(Match2['TF'].unique())
     
     # Load target gene (TG) pseudobulk expression data
-    Target = pd.read_csv(f'{data_dir}/TG_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Target = pd.read_csv(os.path.join(data_dir, 'TG_pseudobulk.tsv'), sep=',', header=0, index_col=0)
     
     # Find common transcription factors (TFs) between the Target genes and the TFName list
     TFlist = list(set(Target.index) & set(TFName[0].values))
@@ -811,10 +814,10 @@ def load_data_scNN(GRNdir: str, species: str, data_dir: str) -> tuple[pd.DataFra
     Exp = Target.loc[TFlist]
     
     # Load regulatory element (RE) pseudobulk chromatin accessibility (openness) data
-    Opn = pd.read_csv(f'{data_dir}/RE_pseudobulk.tsv', sep=',', header=0, index_col=0)
+    Opn = pd.read_csv(os.path.join(data_dir, 'RE_pseudobulk.tsv'), sep=',', header=0, index_col=0)
     
     # Load the RE-to-TG distance link file
-    RE_TGlink = pd.read_csv(f'{data_dir}/RE_gene_distance.txt', sep='\t', header=0)
+    RE_TGlink = pd.read_csv(os.path.join(data_dir, 'RE_gene_distance.txt'), sep='\t', header=0)
     
     # Group the RE-TGlink by gene and aggregate the regulatory elements (REs) for each target gene (TG)
     RE_TGlink = RE_TGlink.groupby('gene').apply(lambda x: x['RE'].values.tolist()).reset_index()
@@ -856,10 +859,10 @@ def RE_TG_dis(data_dir: str, outdir: str) -> None:
     """
 
     # Print status message
-    print('Overlap the regions with gene loc ...')
+    logging.info('Overlap the regions with gene loc ...')
 
     # Load peak (regulatory element) data from the 'Peaks.txt' file
-    peakList = pd.read_csv(data_dir + '/Peaks.txt', index_col=None, header=None)
+    peakList = pd.read_csv(os.path.join(data_dir, 'Peaks.txt'), index_col=None, header=None)
 
     # Parse the peak data into separate columns for chromosome, start, and end positions
     peakList1 = [temp.split(':')[0] for temp in peakList[0].values.tolist()]  # Extract chromosome
@@ -872,26 +875,26 @@ def RE_TG_dis(data_dir: str, outdir: str) -> None:
     peakList['end'] = peakList3
 
     # Save the peak data as a BED file for further processing
-    peakList[['chr', 'start', 'end']].to_csv(outdir + '/Peaks.bed', sep='\t', header=None, index=None)
+    peakList[['chr', 'start', 'end']].to_csv(os.path.join(outdir, 'Peaks.bed'), sep='\t', header=None, index=None)
 
     # Load transcription start site (TSS) data with extended regions (1M upstream/downstream)
-    TSS_1M = pd.read_csv(outdir + '/TSS_extend_1M.txt', sep='\t', header=0)
+    TSS_1M = pd.read_csv(os.path.join(outdir, 'TSS_extend_1M.txt'), sep='\t', header=0)
 
     # Save the TSS data as a BED file
-    TSS_1M.to_csv(outdir + '/TSS_extend_1M.bed', sep='\t', header=None, index=None)
+    TSS_1M.to_csv(os.path.join(outdir, 'TSS_extend_1M.bed'), sep='\t', header=None, index=None)
 
     # Use pybedtools to read the peak and TSS data in BED format
-    a = pybedtools.example_bedtool(outdir + '/Peaks.bed')
-    b = pybedtools.example_bedtool(outdir + '/TSS_extend_1M.bed')
+    a = pybedtools.example_bedtool(os.path.join(outdir, 'Peaks.bed'))
+    b = pybedtools.example_bedtool(os.path.join(outdir, 'TSS_extend_1M.bed'))
 
     # Compute the overlap between peaks (REs) and TSS regions
     a_with_b = a.intersect(b, wa=True, wb=True)
 
     # Save the overlapping regions as a BED file
-    a_with_b.saveas(outdir + 'temp.bed')
+    a_with_b.saveas(os.path.join(outdir, 'temp.bed'))
 
     # Load the overlapping regions data
-    a_with_b = pd.read_csv(outdir + 'temp.bed', sep='\t', header=None)
+    a_with_b = pd.read_csv(os.path.join(outdir, 'temp.bed'), sep='\t', header=None)
 
     # Create a new column 'RE' representing the regulatory element as a combination of chromosome, start, and end
     a_with_b['RE'] = a_with_b[0].astype(str) + ':' + a_with_b[1].astype(str) + '-' + a_with_b[2].astype(str)
@@ -904,7 +907,7 @@ def RE_TG_dis(data_dir: str, outdir: str) -> None:
     temp['distance'] = np.abs(a_with_b[7] - a_with_b[1])
 
     # Save the RE-gene distance data to a file
-    temp.to_csv(outdir + '/RE_gene_distance.txt', sep='\t', index=None)
+    temp.to_csv(os.path.join(outdir, 'RE_gene_distance.txt'), sep='\t', index=None)
 
 
 def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
@@ -960,7 +963,7 @@ def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
     Exp, idx, Opn, adj_matrix_all, Target, data_merge, TF_match = load_data(GRNdir, outdir)
     
     # Save the merged data to a file
-    data_merge.to_csv(outdir + 'data_merge.txt', sep='\t')
+    data_merge.to_csv(os.path.join(outdir, 'data_merge.txt'), sep='\t')
 
     # List of chromosomes to process (1-22 and X)
     chrall = ['chr' + str(i + 1) for i in range(22)]
@@ -974,11 +977,11 @@ def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
         Lossall = np.zeros([data_merge.shape[0], 100])  # Array to store loss values for each gene
 
         chr = chrall[i]  # Current chromosome
-        print(chr, flush=True)
+        logging.info(chr, flush=True)
 
         # Load chromosome-specific index files
-        idx_file1 = GRNdir + chr + '_index.txt'
-        idx_file_all = GRNdir + chr + '_index_all.txt'
+        idx_file1 = os.path.join(GRNdir, f'{chr}_index.txt')
+        idx_file_all = os.path.join(GRNdir, f'{chr}_index_all.txt')
         idx_bulk = pd.read_csv(idx_file1, header=None, sep='\t')
         idxRE_all = pd.read_csv(idx_file_all, header=None, sep='\t')
 
@@ -995,8 +998,8 @@ def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
         input_size_all = idx_bulk.values[:, 3]
 
         # Load pre-trained models and Fisher matrices for the current chromosome
-        fisherall = torch.load(GRNdir + 'fisher_' + chr + '.pt')
-        netall = torch.load(GRNdir + 'all_models_' + chr + '.pt')
+        fisherall = torch.load(os.path.join(GRNdir, f'fisher_{chr}.pt'))
+        netall = torch.load(os.path.join(GRNdir, f'all_models_{chr}.pt'))
 
         # Loop through each gene in the current chromosome
         for ii in range(N):
@@ -1022,17 +1025,17 @@ def training_cpu(GRNdir: str, outdir: str, activef: str, species: str) -> None:
         result.index = data_merge['Symbol'].values
         genetemp = data_merge[data_merge['chr'] == chr]['Symbol'].values
         result = result.loc[genetemp]
-        result.to_csv(outdir + 'result_' + chr + '.txt', sep='\t')
+        result.to_csv(os.path.join(outdir, f'result_{chr}.txt'), sep='\t')
 
         # Save the trained models and SHAP values for the current chromosome
-        torch.save(netall_s, outdir + 'net_' + chr + '.pt')
-        torch.save(shapall_s, outdir + 'shap_' + chr + '.pt')
+        torch.save(netall_s, os.path.join(outdir, f'net_{chr}.pt'))
+        torch.save(shapall_s, os.path.join(outdir, f'shap_{chr}.pt'))
 
         # Save loss values for the current chromosome
         Lossall = pd.DataFrame(Lossall)
         Lossall.index = data_merge['Symbol'].values
         Lossall = Lossall.loc[genetemp]
-        Lossall.to_csv(outdir + 'Loss_' + chr + '.txt', sep='\t')
+        Lossall.to_csv(os.path.join(outdir, f'Loss_{chr}.txt'), sep='\t')
 
 
 def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: str) -> None:
@@ -1075,7 +1078,7 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
     if method == 'LINGER':
         # Set the device to GPU if available, otherwise fallback to CPU
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f'Using device: {device}')
+        logging.info(f'Using device: {device}')
         
         # Neural network parameters
         hidden_size = 64
@@ -1089,7 +1092,7 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
 
         # Load GRN data
         Exp, idx, Opn, adj_matrix_all, Target, data_merge, TF_match = load_data(GRNdir, outdir)
-        data_merge.to_csv(outdir + 'data_merge.txt', sep='\t')
+        data_merge.to_csv(os.path.join(outdir, 'data_merge.txt'), sep='\t')
 
         # Chromosome list (chr1 to chr22 and chrX)
         chrall = ['chr' + str(i + 1) for i in range(22)]
@@ -1103,11 +1106,11 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
             Lossall = np.zeros([data_merge.shape[0], 100])  # Store the loss values
 
             chrom = chrall[i]
-            print(f'Processing chromosome {chrom}')
+            logging.info(f'Processing chromosome {chrom}')
 
             # Load index files for the current chromosome
-            idx_file1 = GRNdir + chrom + '_index.txt'
-            idx_file_all = GRNdir + chrom + '_index_all.txt'
+            idx_file1 = os.path.join(GRNdir, f'{chrom}_index.txt')
+            idx_file_all = os.path.join(GRNdir, f'{chrom}_index_all.txt')
             idx_bulk = pd.read_csv(idx_file1, header=None, sep='\t')
             idxRE_all = pd.read_csv(idx_file_all, header=None, sep='\t')
 
@@ -1124,8 +1127,8 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
             input_size_all = idx_bulk.values[:, 3]
 
             # Load the pre-trained models and move them to the GPU
-            fisherall = torch.load(GRNdir + 'fisher_' + chrom + '.pt', map_location=device)
-            netall = torch.load(GRNdir + 'all_models_' + chrom + '.pt', map_location=device)
+            fisherall = torch.load(os.path.join(GRNdir, f'fisher_{chrom}.pt'), map_location=device)
+            netall = torch.load(os.path.join(GRNdir, f'all_models_{chrom}.pt'), map_location=device)
 
             # Loop through the genes in the chromosome
             for ii in range(N):
@@ -1154,17 +1157,17 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
             result.index = data_merge['Symbol'].values
             genetemp = data_merge[data_merge['chr'] == chrom]['Symbol'].values
             result = result.loc[genetemp]
-            result.to_csv(outdir + 'result_' + chrom + '.txt', sep='\t')
+            result.to_csv(os.path.join(outdir, f'result_{chrom}.txt'), sep='\t')
 
             # Save the trained models and SHAP values
-            torch.save(netall_s, outdir + 'net_' + chrom + '.pt')
-            torch.save(shapall_s, outdir + 'shap_' + chrom + '.pt')
+            torch.save(netall_s, os.path.join(outdir, f'net_{chrom}.pt'))
+            torch.save(shapall_s, os.path.join(outdir, f'shap_{chrom}.pt'))
 
             # Save the loss values for the chromosome
             Lossall = pd.DataFrame(Lossall)
             Lossall.index = data_merge['Symbol'].values
             Lossall = Lossall.loc[genetemp]
-            Lossall.to_csv(outdir + 'Loss_' + chrom + '.txt', sep='\t')
+            Lossall.to_csv(os.path.join(outdir, f'Loss_{chrom}.txt'), sep='\t')
     if method=='scNN':
         hidden_size  = 64
         hidden_size2 = 16
@@ -1175,9 +1178,7 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
         fisher_w=0.1
         n_jobs=16
         Exp,Opn,Target,RE_TGlink=load_data_scNN(GRNdir,species)
-        import warnings
-        import time
-        from tqdm import tqdm
+
         netall_s={}
         shapall_s={}
         #result=np.zeros([data_merge.shape[0],2])
@@ -1197,9 +1198,9 @@ def training_gpu(GRNdir: str, method: str, outdir: str, activef: str, species: s
                 netall_s[ii]=res[0]
                 shapall_s[ii]=res[1]
                 Lossall[ii,:]=res[2].T   
-            torch.save(netall_s,outdir+chrtemp+'_net.pt')
-            torch.save(shapall_s,outdir+chrtemp+'_shap.pt')
+            torch.save(netall_s, os.path.join(outdir, f'{chrtemp}_net.pt'))
+            torch.save(shapall_s, os.path.join(outdir, f'{chrtemp}_shap.pt'))
             Lossall=pd.DataFrame(Lossall)
             Lossall.index=RE_TGlink1['gene'].values
-            Lossall.to_csv(outdir+chrtemp+'_Loss.txt',sep='\t') 
-        RE_TGlink.to_csv(outdir+'RE_TGlink.txt',sep='\t',index=None)
+            Lossall.to_csv(os.path.join(outdir, f'{chrtemp}_Loss.txt'),sep='\t') 
+        RE_TGlink.to_csv(os.path.join(outdir, 'RE_TGlink.txt'),sep='\t',index=None)

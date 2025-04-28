@@ -1,6 +1,39 @@
+# Standard libraries
+import os
+import time
+import warnings
+import logging
+
+# Numerical and DataFrame libraries
+import numpy as np
+import pandas as pd
+
+# Deep learning
+import torch
+
+# Machine learning
+from sklearn.decomposition import PCA
+from sklearn.impute import KNNImputer
+
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.colors as mcolors
+from matplotlib.colors import LinearSegmentedColormap
+
+# Dimensionality reduction
+import umap
+import scanpy as sc
+
+# Progress bar
+from tqdm import tqdm
+
+# Project-specific
+import LingerGRN
+from LingerGRN import pseudo_bulk
+
+
 def generate_colors(N):
-    import matplotlib.colors as mcolors
-    import seaborn as sns
     """
     Generate N visually appealing colors using seaborn color palette.
     
@@ -13,23 +46,21 @@ def generate_colors(N):
     color_palette = sns.color_palette("husl", N)
     colors = [mcolors.rgb2hex(color_palette[i]) for i in range(N)]
     return colors
+
 def load_data_ptb(Input_dir,outdir,GRNdir):
-    import pandas as pd
-    import numpy as np
-    import torch
     ATAC_file='ATAC.txt'
-    idx_file=outdir+'index.txt'
+    idx_file=os.path.join(outdir, 'index.txt')
     RNA_file='RNA.txt'
     label_file='label.txt'
-    TFName=outdir+'TFName.txt'
-    from LingerGRN import pseudo_bulk
+    TFName=os.path.join(outdir, 'TFName.txt')
+
     RNA=pd.read_csv(Input_dir+RNA_file,sep='\t',index_col=0)
     ATAC=pd.read_csv(Input_dir+ATAC_file,sep='\t',index_col=0)
     RNA = np.log2(1 + RNA)
-    from sklearn.impute import KNNImputer
+
     K=int(np.floor(np.sqrt(RNA.shape[1])))
     imputer = KNNImputer(n_neighbors=K)
-# RNA row is genes col is cells
+    # RNA row is genes col is cells
     TG_filter1 = imputer.fit_transform(RNA.values.T)
     TG_filter1=pd.DataFrame(TG_filter1.T,columns=RNA.columns,index=RNA.index)
     RE_filter1 = imputer.fit_transform(np.log2(1+ATAC.values.T))
@@ -49,14 +80,9 @@ def load_data_ptb(Input_dir,outdir,GRNdir):
     chrall.append('X')
     data_merge=pd.read_csv(outdir+'data_merge.txt',sep='\t',index_col=0)
     return chrall,data_merge,Exp,Opn,Target,idx,TFname
+
 def LINGER_simulation(ii,gene_chr,TFindex,Exp,REindex,Opn,netall,index_all):
-    import warnings
-    import time
-    import LingerGRN
-    from tqdm import tqdm
-    import torch
-    import pandas as pd
-    import numpy as np
+
     eps=1e-6
     gene_idx=gene_chr['id_s'].values[ii]-1
     TFidxtemp=TFindex[gene_idx]
@@ -83,17 +109,14 @@ def LINGER_simulation(ii,gene_chr,TFindex,Exp,REindex,Opn,netall,index_all):
     y_pred = loaded_net(X_tr)
     return y_pred
 def get_simulation(outdir,chrall,data_merge,GRNdir,Exp,Opn,Target,idx):
-    import warnings
-    import time
-    import LingerGRN
-    from tqdm import tqdm
-    import torch
-    import pandas as pd
-    import numpy as np
+
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     output=np.zeros(Target.shape)
     for i in range(23):
         chr='chr'+chrall[i]
-        print(chr)
+        logging.info(chr)
         gene_chr=data_merge[data_merge['chr']==chr]
         N=len(gene_chr)
         netall=torch.load(outdir+'net_'+chr+'.pt')
@@ -112,13 +135,7 @@ def get_simulation(outdir,chrall,data_merge,GRNdir,Exp,Opn,Target,idx):
     output1=pd.DataFrame(output,index=data_merge.loc[range(Target.shape[0])]['Symbol'])
     return output1
 def umap_embedding(outdir,Target,original,perturb,Input_dir):
-    import umap
-    import scanpy as sc
-# Assuming you have loaded or created an AnnData object named 'adata'
-# Create and train the UMAP model
-    from sklearn.decomposition import PCA
-    import numpy as np
-    import pandas as pd
+
 #RNA=pd.read_csv(Input_dir+'RNA.txt',header=0,index_col=0,sep='\t')
     Symbol=pd.read_csv(outdir+'Symbol.txt',header=None,sep='\t')
 #sampleall=RNA.columns
@@ -159,14 +176,9 @@ def umap_embedding(outdir,Target,original,perturb,Input_dir):
 # Assuming you have a continuous value stored in `continuous_values`
 # Define the color for small values (e.g., white) and the color for higher values
 def diff_umap(TFko,TFName,save,outdir,embedding,perturb,original,Input_dir):
-    import seaborn as sns
-    import matplotlib.colors as mcolors
-    import pandas as pd
-    import numpy as np
-    import matplotlib.pyplot as plt
+
     label=pd.read_csv(Input_dir+'label.txt',sep='\t',header=None)
     label=label[0].values
-    from matplotlib.colors import LinearSegmentedColormap
     zero_color = 'white'
     positive_color = 'orange'
     negative_color = 'blue'
@@ -197,11 +209,7 @@ def diff_umap(TFko,TFName,save,outdir,embedding,perturb,original,Input_dir):
     plt.close()
 # Define the colors for each cluster
 def Umap_direct(TFko,Input_dir,embedding,D,save,outdir):
-    import seaborn as sns
-    import matplotlib.colors as mcolors
-    import pandas as pd
-    import numpy as np
-    import matplotlib.pyplot as plt 
+
     label=pd.read_csv(Input_dir+'label.txt',sep='\t',header=None)
     label=label[0].values
     N=len(np.unique(label))

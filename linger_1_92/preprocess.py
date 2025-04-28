@@ -5,6 +5,11 @@ import pandas as pd
 #import LingerGRN.pseudo_bulk as pseudo_bulk
 import subprocess
 from tqdm import tqdm
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
 def list2mat(df,i_n,j_n,x_n):
     TFs = df[j_n].unique()
     REs = df[i_n].unique()
@@ -210,30 +215,30 @@ def extract_overlap_regions(genome,GRNdir,outdir,method):
 def preprocess(TG_pseudobulk,RE_pseudobulk,GRNdir,genome,method,outdir):
     #package_dir = os.path.dirname(os.path.abspath(__file__))
     if method=='LINGER':
-        #print('Overlap the regions with bulk data ...')
+        #logging.info('Overlap the regions with bulk data ...')
         #script_path = os.path.join("extract_overlap_regions_LINGER.sh")
         #subprocess.run(["sh", script_path, GRNdir, genome,outdir,workdir])
-        #print('Generate pseudobulk ...')
+        #logging.info('Generate pseudobulk ...')
         #TG_pseudobulk,RE_pseudobulk=pseudo_bulk.pseudo_bulk(adata_RNA,adata_ATAC)
         extract_overlap_regions(genome,GRNdir,outdir,method)
-        print('Mapping gene expression...')
+        logging.info('Mapping gene expression...')
         TFName = pd.read_csv(GRNdir+'TFName.txt',header=None)
         TFName.columns=['TFName']
         TFName=TFName['TFName'].values
         Match2=pd.read_csv(GRNdir+'Match2.txt',sep='\t')
         Match2=Match2.values
         List,A=gene_expression(GRNdir,TG_pseudobulk,outdir)
-        print('Generate TF expression...')
+        logging.info('Generate TF expression...')
         TFName=TF_expression(TFName,List,Match2,A,outdir)
-        print('Generate RE chromatin accessibility...')
+        logging.info('Generate RE chromatin accessibility...')
         RE_pseudobulk.to_csv(outdir+'Openness.txt',sep='\t',header=None,index=None)
-        print('Generate TF binding...')
+        logging.info('Generate TF binding...')
         Element_name_bulk = pd.read_csv(GRNdir+'all_hg19.txt', delimiter="\t", header=None)
         Element_name_bulk=Element_name_bulk[0].values
         Element_name = RE_pseudobulk.index
         motifWeight=pd.read_csv(GRNdir+'motifWeight.txt',index_col=0,sep='\t')
         load_TFbinding(GRNdir,motifWeight,Match2,TFName,Element_name,outdir)
-        print('Generate Index...')
+        logging.info('Generate Index...')
     #Read hg19_Peak_hg19_gene_u.txt
         merged_s,merged_b=load_corr_RE_TG(List,Element_name,Element_name_bulk,outdir)
         from tqdm import tqdm
@@ -246,12 +251,12 @@ def preprocess(TG_pseudobulk,RE_pseudobulk,GRNdir,genome,method,outdir):
             out[i, :] = index_generate(choosL_i,merged_s,merged_b,TFName)
         pd.DataFrame(out).to_csv(outdir+'index.txt', sep='\t', header=None, index=None)
     elif method=='baseline':
-        print('Overlap the regions with bulk data ...')
+        logging.info('Overlap the regions with bulk data ...')
         #script_path = os.path.join( "extract_overlap_regions_baseline.sh")
         #subprocess.run(["sh", script_path, GRNdir, genome,outdir,workdir])
         extract_overlap_regions(genome,GRNdir,outdir,method)
     else:
-        print('Method:' +method+ 'is not found! Please set method as baseline or LINGER')
+        logging.info('Method:' +method+ 'is not found! Please set method as baseline or LINGER')
 
 import scanpy as sc
 #set some figure parameters for nice display inside jupyternotebooks.

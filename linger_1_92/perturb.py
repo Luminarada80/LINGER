@@ -90,10 +90,14 @@ def get_simulation(outdir,chrall,data_merge,GRNdir,Exp,Opn,Target,idx):
     import torch
     import pandas as pd
     import numpy as np
+    import logging
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     output=np.zeros(Target.shape)
     for i in range(23):
         chr='chr'+chrall[i]
-        print(chr)
+        logging.info(chr)
         gene_chr=data_merge[data_merge['chr']==chr]
         N=len(gene_chr)
         netall=torch.load(outdir+'net_'+chr+'.pt')
