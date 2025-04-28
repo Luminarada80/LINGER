@@ -62,7 +62,7 @@ if "K562" in args.rna_data_path:
     cell_type = 'K562'
 elif "Macrophase" in args.rna_data_path:
     cell_type = "macrophage"
-elif "filtered_L2" in args.rna_data_path:
+else:
     cell_type = 'mESC'
 
 label = pd.DataFrame({
