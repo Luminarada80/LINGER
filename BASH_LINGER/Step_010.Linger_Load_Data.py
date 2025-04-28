@@ -39,16 +39,16 @@ args = parser.parse_args()
 output_dir = args.sample_data_dir + "/"
 
 # ----- THIS PART DIFFERS BETWEEN DATASETS -----
-logging.info('\tReading in cell labels...', flush=True)
+logging.info('\tReading in cell labels...')
 # Load scRNA-seq data
 rna_data = pd.read_csv(args.rna_data_path, sep=',', index_col=0)
 atac_data = pd.read_csv(args.atac_data_path, sep=',', index_col=0)
 
 # Update the index to replace '-' with ':' for the chromosome coordinates chr-start-stop -> chr:start-stop
 if not atac_data.index.str.contains(':').all():
-    logging.info(atac_data.index[0], flush=True)
+    logging.info(atac_data.index[0])
     atac_data.index = atac_data.index.str.replace('-', ':', n=1)
-    logging.info(atac_data.index[0], flush=True)
+    logging.info(atac_data.index[0])
 
     atac_data.to_csv(args.atac_data_path, sep=',')
 
@@ -58,7 +58,7 @@ features = pd.DataFrame({
     0: rna_data.index.tolist() + atac_data.index.tolist(),  # Combine RNA and ATAC feature names
     1: ['Gene Expression'] * len(rna_data.index) + ['Peaks'] * len(atac_data.index)  # Assign types
 })
-logging.info(features, flush=True)
+logging.info(features)
 barcodes = pd.DataFrame(rna_data.columns.values, columns=[0])
 
 # Detect if the cell type is K562 or macrophage
@@ -76,40 +76,40 @@ label = pd.DataFrame({
 
 # ---------------------------------------------------
 
-logging.info('\nExtracting the adata RNA and ATAC seq data...', flush=True)
+logging.info('\nExtracting the adata RNA and ATAC seq data...')
 # Create AnnData objects for the scRNA-seq and scATAC-seq datasets
 adata_RNA, adata_ATAC = get_adata(matrix, features, barcodes, label)
 
-logging.info(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells', flush=True)
-logging.info(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells', flush=True)
+logging.info(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
+logging.info(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
 # Remove low count cells and genes
-logging.info('\nFiltering Data', flush=True)
-logging.info(f'\tFiltering out cells with less than 200 genes...', flush=True)
+logging.info('\nFiltering Data')
+logging.info(f'\tFiltering out cells with less than 200 genes...')
 sc.pp.filter_cells(adata_RNA, min_genes=200)
 adata_RNA = adata_RNA.copy()
-logging.info(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells', flush=True)
+logging.info(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
 
-logging.info(f'\tFiltering out genes expressed in fewer than 3 cells...', flush=True)
+logging.info(f'\tFiltering out genes expressed in fewer than 3 cells...')
 sc.pp.filter_genes(adata_RNA, min_cells=3)
 adata_RNA = adata_RNA.copy()
-logging.info(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells', flush=True)
+logging.info(f'\t\tShape of the RNA dataset = {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
 
-logging.info(f'\tFiltering out cells with less than 200 ATAC-seq peaks...', flush=True)
+logging.info(f'\tFiltering out cells with less than 200 ATAC-seq peaks...')
 sc.pp.filter_cells(adata_ATAC, min_genes=200)
 adata_ATAC = adata_ATAC.copy()
-logging.info(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells', flush=True)
+logging.info(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
-logging.info(f'\tFiltering out peaks expressed in fewer than 3 cells...', flush=True)
+logging.info(f'\tFiltering out peaks expressed in fewer than 3 cells...')
 sc.pp.filter_genes(adata_ATAC, min_cells=3)
 adata_ATAC = adata_ATAC.copy()
-logging.info(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells', flush=True)
+logging.info(f'\t\tShape of the ATAC dataset = {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
-logging.info('\nShape of the dataset after filtering', flush=True)
-logging.info(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells', flush=True)
-logging.info(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells', flush=True)
+logging.info('\nShape of the dataset after filtering')
+logging.info(f'\tscRNAseq Dataset: {adata_RNA.shape[1]} genes, {adata_RNA.shape[0]} cells')
+logging.info(f'\tscATACseq Dataset: {adata_ATAC.shape[1]} peaks, {adata_ATAC.shape[0]} cells')
 
-logging.info(f'\nCombining RNA and ATAC seq barcodes', flush=True)
+logging.info(f'\nCombining RNA and ATAC seq barcodes')
 selected_barcode = list(set(adata_RNA.obs['barcode'].values) & set(adata_ATAC.obs['barcode'].values))
 
 rna_barcode_idx = pd.DataFrame(range(adata_RNA.shape[0]), index=adata_RNA.obs['barcode'].values)
@@ -118,7 +118,7 @@ atac_barcode_idx = pd.DataFrame(range(adata_ATAC.shape[0]), index=adata_ATAC.obs
 adata_RNA = adata_RNA[rna_barcode_idx.loc[selected_barcode][0]].copy()
 adata_ATAC = adata_ATAC[atac_barcode_idx.loc[selected_barcode][0]].copy()
 
-logging.info(f'\nGenerating pseudo-bulk / metacells', flush=True)
+logging.info(f'\nGenerating pseudo-bulk / metacells')
 samplelist = list(set(adata_ATAC.obs['sample'].values))
 tempsample = samplelist[0]
 
@@ -126,7 +126,6 @@ TG_pseudobulk = pd.DataFrame([])
 RE_pseudobulk = pd.DataFrame([])
 
 singlepseudobulk = (adata_RNA.obs['sample'].unique().shape[0] * adata_RNA.obs['sample'].unique().shape[0] > 100)
-logging.info(f'\tsinglepseudobulk = {singlepseudobulk}', flush=True)
 
 for tempsample in samplelist:
     adata_RNAtemp = adata_RNA[adata_RNA.obs['sample'] == tempsample].copy()
@@ -142,24 +141,24 @@ for tempsample in samplelist:
 if not os.path.exists(args.sample_data_dir):
     os.makedirs(args.sample_data_dir)
 
-logging.info(f'Writing adata_ATAC.h5ad and adata_RNA.h5ad', flush=True)
+logging.info(f'Writing adata_ATAC.h5ad and adata_RNA.h5ad')
 adata_ATAC.write_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 adata_RNA.write_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
 
 TG_pseudobulk = TG_pseudobulk.fillna(0)
 RE_pseudobulk = RE_pseudobulk.fillna(0)
 
-logging.info(f'Writing out peak gene ids', flush=True)
+logging.info(f'Writing out peak gene ids')
 pd.DataFrame(adata_ATAC.var['gene_ids']).to_csv(f'{args.sample_data_dir}/Peaks.txt', header=None, index=None)
 
-logging.info(f'Writing out pseudobulk...', flush=True)
+logging.info(f'Writing out pseudobulk...')
 TG_pseudobulk.to_csv(f'{args.sample_data_dir}/TG_pseudobulk.tsv', sep='\t', index=True)
 RE_pseudobulk.to_csv(f'{args.sample_data_dir}/RE_pseudobulk.tsv', sep='\t', index=True)
 
 if args.organism.lower() == 'human':
 
     # Overlap the region with the general GRN
-    logging.info('Overlapping the regions with the general model', flush=True)
+    logging.info('Overlapping the regions with the general model')
     preprocess(
         TG_pseudobulk,
         RE_pseudobulk,
@@ -170,4 +169,4 @@ if args.organism.lower() == 'human':
         output_dir=args.sample_data_dir
         )
 
-    logging.info('Finished Preprocessing', flush=True)
+    logging.info('Finished Preprocessing')

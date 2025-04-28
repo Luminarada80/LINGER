@@ -1,55 +1,5 @@
 #!/bin/bash
 
-# Define sample numbers
-# 1 2 3 4 5 6 7 8 9 10
-
-# 1000 2000 3000 4000 5000
-
-# Macrophase_buffer1_stability_1 
-# Macrophase_buffer1_stability_2 
-# Macrophase_buffer1_stability_3 
-# Macrophase_buffer1_stability_4 
-# Macrophase_buffer1_stability_5 
-# Macrophase_buffer1_stability_6 
-# Macrophase_buffer1_stability_7 
-# Macrophase_buffer1_stability_8 
-# Macrophase_buffer1_stability_9 
-# Macrophase_buffer1_stability_10
-
-# Macrophase_buffer2_stability_1 
-# Macrophase_buffer2_stability_2 
-# Macrophase_buffer2_stability_3 
-# Macrophase_buffer2_stability_4 
-# Macrophase_buffer2_stability_5 
-# Macrophase_buffer2_stability_6 
-# Macrophase_buffer2_stability_7 
-# Macrophase_buffer2_stability_8 
-# Macrophase_buffer2_stability_9 
-# Macrophase_buffer2_stability_10
-
-# Macrophase_buffer3_stability_1 
-# Macrophase_buffer3_stability_2 
-# Macrophase_buffer3_stability_3 
-# Macrophase_buffer3_stability_4 
-# Macrophase_buffer3_stability_5 
-# Macrophase_buffer3_stability_6 
-# Macrophase_buffer3_stability_7 
-# Macrophase_buffer3_stability_8 
-# Macrophase_buffer3_stability_9 
-# Macrophase_buffer3_stability_10
-
-# Macrophase_buffer4_stability_1 
-# Macrophase_buffer4_stability_2 
-# Macrophase_buffer4_stability_3 
-# Macrophase_buffer4_stability_4 
-# Macrophase_buffer4_stability_5 
-# Macrophase_buffer4_stability_6 
-# Macrophase_buffer4_stability_7 
-# Macrophase_buffer4_stability_8 
-# Macrophase_buffer4_stability_9 
-# Macrophase_buffer4_stability_10
-
-
 SAMPLE_NUMS=(
     # Need to change filename in 'run_linger_mesc.sh' to run the 70 percent subsamples
     # 70_percent_subsampled_1_E7.5_rep1
@@ -137,7 +87,7 @@ SAMPLE_NUMS=(
     # "5000_cells_E8.5_CRISPR_T_WT"
     # "5000_cells_E8.5_rep1"
     # "5000_cells_E8.5_rep2"
-    # "filtered_L2_E7.5_rep1"
+    "filtered_L2_E7.5_rep1"
     # "filtered_L2_E7.5_rep2"
     # "filtered_L2_E7.75_rep1"
     # "filtered_L2_E8.0_rep1"
@@ -149,9 +99,14 @@ SAMPLE_NUMS=(
     # "filtered_L2_E8.75_rep2"
 )
 
-
-
 # Submit each SAMPLE_NUM as a separate job
 for SAMPLE_NUM in "${SAMPLE_NUMS[@]}"; do
-  sbatch --export=SAMPLE_NUM="$SAMPLE_NUM" run_linger_mesc.sh
+
+  mkdir -p "LOGS/${SAMPLE_NUM}"
+  sbatch \
+    --export=SAMPLE_NUM="$SAMPLE_NUM" \
+    --output="LOGS/${SAMPLE_NUM}/${SAMPLE_NUM}.out" \
+    --error="LOGS/${SAMPLE_NUM}/${SAMPLE_NUM}.err" \
+    --job-name="LINGER_${SAMPLE_NUM}" \
+    run_linger_mesc.sh
 done

@@ -14,6 +14,12 @@ set -euo pipefail
 # Conda environment name
 CONDA_ENV_NAME="LINGER"
 
+GENOME='hg38'
+METHOD='LINGER'
+CELLTYPE='macrophage'
+ACTIVEF='ReLU'
+ORGANISM="human"
+
 # Scripts and data paths
 SCRIPTS_DIR="/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/BASH_LINGER"
 DATA_DIR="/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER/LINGER_MACROPHAGE"
@@ -24,6 +30,9 @@ BULK_MODEL_DIR="/gpfs/Labs/Uzun/DATA/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LING
 RNA_DATA_PATH="${DATA_DIR}/${SAMPLE_NUM}_RNA.csv"
 ATAC_DATA_PATH="${DATA_DIR}/${SAMPLE_NUM}_ATAC.csv"
 GROUND_TRUTH_PATH="${DATA_DIR}/RN204_macrophage_ground_truth.tsv"
+
+# Motif and TSS information for non-human samples (for Homer)
+TSS_MOTIF_INFO_PATH=""
 
 SAMPLE_RESULTS_DIR="${RESULTS_DIR}/${SAMPLE_NUM}"
 SAMPLE_DATA_DIR="${RESULTS_DIR}/LINGER_TRAINED_MODELS/${SAMPLE_NUM}"
@@ -84,7 +93,6 @@ check_tools() {
 
 activate_conda_env() {
     echo "[INFO] Activating Conda environment '$CONDA_ENV_NAME'..."
-    source /gpfs/Home/esm5360/.bashrc
     if ! conda activate "$CONDA_ENV_NAME"; then
         echo "[ERROR] Could not activate Conda environment '$CONDA_ENV_NAME'."
         exit 1
@@ -112,7 +120,7 @@ setup_directories() {
 
 set_slurm_job_name() {
     echo "[INFO] Setting dynamic SLURM job name..."
-    scontrol update JobID="$SLURM_JOB_ID" JobName="linger_macrophage_stability_${SAMPLE_NUM}"
+    scontrol update JobID="$SLURM_JOB_ID" JobName="LINGER_${SAMPLE_NUM}"
 }
 
 # ==========================================
@@ -128,44 +136,45 @@ run_step() {
 }
 
 run_pipeline() {
-    run_step "Step_010.Linger_Load_Data" "${SCRIPTS_DIR}/Step_010.Linger_Load_Data.py" \
-        --rna_data_path "$RNA_DATA_PATH" \
-        --atac_data_path "$ATAC_DATA_PATH" \
-        --data_dir "$DATA_DIR" \
-        --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "human" \
-        --bulk_model_dir "$BULK_MODEL_DIR" \
-        --genome "hg38" \
-        --method "LINGER"
+    # run_step "Step_010.Linger_Load_Data" "${SCRIPTS_DIR}/Step_010.Linger_Load_Data.py" \
+    #     --rna_data_path "$RNA_DATA_PATH" \
+    #     --atac_data_path "$ATAC_DATA_PATH" \
+    #     --data_dir "$DATA_DIR" \
+    #     --sample_data_dir "$SAMPLE_DATA_DIR" \
+    #     --organism "$ORGANISM" \
+    #     --bulk_model_dir "$BULK_MODEL_DIR" \
+    #     --genome "$GENOME" \
+    #     --method "$METHOD"
 
     run_step "Step_020.Linger_Training" "${SCRIPTS_DIR}/Step_020.Linger_Training.py" \
+        --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "human" \
+        --organism "$ORGANISM" \
         --bulk_model_dir "$BULK_MODEL_DIR" \
-        --genome "hg38" \
-        --method "LINGER" \
-        --activef "ReLU"
+        --genome "$GENOME" \
+        --method "$METHOD" \
+        --activef "$ACTIVEF"
 
     run_step "Step_030.Create_Cell_Population_GRN" "${SCRIPTS_DIR}/Step_030.Create_Cell_Population_GRN.py" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "human" \
-        --genome "hg38" \
-        --method "LINGER" \
-        --activef "ReLU"
+        --organism "$ORGANISM" \
+        --genome "$GENOME" \
+        --method "$METHOD" \
+        --activef "$ACTIVEF"
 
     run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "human" \
-        --genome "hg38" \
-        --method "LINGER" \
-        --celltype "macrophage"
+        --organism "$ORGANISM" \
+        --genome "$GENOME" \
+        --method "$METHOD" \
+        --celltype "$CELLTYPE"
 
     run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "human" \
-        --genome "hg38" \
-        --method "LINGER" \
-        --celltype "macrophage" \
+        --organism "$ORGANISM" \
+        --genome "$GENOME" \
+        --method "$METHOD" \
+        --celltype "$CELLTYPE" \
         --num_cells 1000
 }
 

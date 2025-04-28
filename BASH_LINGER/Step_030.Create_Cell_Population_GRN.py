@@ -2,6 +2,11 @@ import scanpy as sc
 
 import sys
 import argparse
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
 
 parser = argparse.ArgumentParser(description="Generate cell population GRN.")
@@ -23,12 +28,12 @@ elif args.organism.lower() == "human":
   import linger.LL_net as LL_net
 
 # Load in the adata_RNA and adata_ATAC files
-print(f'Reading in the RNAseq and ATACseq h5ad adata', flush=True)
+logging.info(f'Reading in the RNAseq and ATACseq h5ad adata')
 adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
 adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
 # Calculate the TF RE binding potential
-print(f'Calculating the TF RE binding potential', flush=True)
+logging.info(f'Calculating the TF RE binding potential')
 LL_net.TF_RE_binding(
   args.tss_motif_info_path,
   args.sample_data_dir,
@@ -40,7 +45,7 @@ LL_net.TF_RE_binding(
   )
 
 # Calculate the cis-regulatory scores
-print(f'Calculating the cis-regulatory network', flush=True)
+logging.info(f'Calculating the cis-regulatory network')
 LL_net.cis_reg(
   args.tss_motif_info_path,
   args.sample_data_dir,
@@ -52,7 +57,7 @@ LL_net.cis_reg(
   )
 
 # Calculate the trans-regulatory scores
-print(f'Calculating the trans-regulatory network', flush=True)
+logging.info(f'Calculating the trans-regulatory network')
 LL_net.trans_reg(
   args.tss_motif_info_path,
   args.sample_data_dir,
