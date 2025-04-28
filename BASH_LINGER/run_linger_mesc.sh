@@ -132,10 +132,10 @@ run_step() {
   step_name=$1
   script_path=$2
   shift 2  # Remove the first two arguments
+  echo ""
   echo "Running $step_name..."
-  
-  # Use /usr/bin/time with verbose output to capture memory and timing
   /usr/bin/time -v python3 "$script_path" "$@" 2> "${LOG_DIR}/${SAMPLE_NUM}/${step_name}_time_mem.log"
+  echo "    Done!"
 }
 
 run_pipeline() {
@@ -193,7 +193,7 @@ run_pipeline() {
 #               MAIN
 # ==========================================
 
-
+echo "===== RUNNING VALIDATION CHECKS ====="
 validate_critical_variables
 check_for_running_jobs
 check_tools
@@ -201,4 +201,6 @@ check_input_files
 activate_conda_env
 setup_directories
 set_slurm_job_name
+echo ""
+echo "===== CHECKS COMPLETE: STARTING MAIN PIPELINE ====="
 run_pipeline
