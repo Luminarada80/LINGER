@@ -153,9 +153,9 @@ def load_region(GRNdir,genome,chrN,outdir):
     O_overlap_u=list(set(O_overlap))
     N_overlap_u=list(set(N_overlap))
     #O_all=merge_columns_in_bed_file(GRNdir+'Peaks_'+chrN+'.bed',1)
-    hg19_region=merge_columns_in_bed_file(os.path.join(GRNdir+f'hg19_Peaks_{chrN}.bed'),1)
+    hg19_region=merge_columns_in_bed_file(os.path.join(GRNdir, f'hg19_Peaks_{chrN}.bed'),1)
     hg19_region=pd.DataFrame(range(len(hg19_region)),index=hg19_region)
-    hg38_region=merge_columns_in_bed_file(os.path.join(GRNdir+f'hg38_Peaks_{chrN}.bed'),1)
+    hg38_region=merge_columns_in_bed_file(os.path.join(GRNdir, f'hg38_Peaks_{chrN}.bed'),1)
     hg38_region=pd.DataFrame(range(len(hg38_region)),index=hg38_region)
     if genome=='hg19':
         idx=hg19_region.loc[O_overlap_u][0].values
@@ -194,7 +194,7 @@ def TF_RE_LINGER_chr(chr,outdir):
     # Read the first column and store it in a list
         first_column = [row[0] for row in reader]
     REName=np.array(first_column)
-    idx_file=outdir+'index.txt'
+    idx_file=os.path.join(outdir, 'index.txt')
     data0=pd.read_csv(os.path.join(outdir, f'result_{chr}.txt'),sep='\t')
     data0.columns=['gene','x','y']
     idx_file=os.path.join(outdir, 'index.txt')
@@ -388,15 +388,15 @@ def TF_RE_binding(GRNdir,data_dir,adata_RNA,adata_ATAC,genome,method,outdir):
             result.to_csv(os.path.join(outdir, f'{chrtemp}_cell_population_TF_RE_binding.txt'),sep='\t')
             result_all=pd.concat([result_all,result],axis=0)
         result=result_all.copy()
-    result.to_csv(outdir+'cell_population_TF_RE_binding.txt',sep='\t')   
+    result.to_csv(os.path.join(outdir, 'cell_population_TF_RE_binding.txt'),sep='\t')   
         
 def load_TFbinding_scNN(GRNdir,outdir,genome):
     genome_map=pd.read_csv(os.path.join(GRNdir, 'genome_map_homer.txt'),sep='\t',header=0)
     genome_map.index=genome_map['genome_short'].values 
-    A=pd.read_csv(outdir+'MotifTarget.bed',sep='\t',header=0,index_col=None)     
+    A=pd.read_csv(os.path.join(outdir, 'MotifTarget.bed'),sep='\t',header=0,index_col=None)     
             #Motif_binding,REs1,motifs=list2mat(A,'PositionID','Motif Name','MotifScore')
     A['MotifScore']=np.log(1+A['MotifScore']); 
-    Match2=pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{genome_map.loc[genome]['species_ensembl']}.txt'),sep='\t',header=0)
+    Match2=pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{genome_map.loc[genome]["species_ensembl"]}.txt'),sep='\t',header=0)
     TF_binding,REs1,motifs=list2mat(A,'PositionID','Motif Name','MotifScore')
     TF_binding1=pd.DataFrame(TF_binding.T,index=motifs,columns=REs1)
     TF_binding1['motif']=motifs
@@ -544,7 +544,7 @@ def cell_type_specific_TF_RE_binding(GRNdir,adata_RNA,adata_ATAC,genome,celltype
         REidx=pd.DataFrame(range(mat.shape[0]),index=mat.index)
         TFbinding1[REidx.loc[TFbinding.index][0].values,:]=TFbinding.values
         TFbinding1 = pd.DataFrame(TFbinding1,index=mat.index,columns=TFoverlap)
-        logging.info('Generate cell type specitic TF binding potential for cell type '+ str(label0)+'...')
+        logging.info('Generate cell type specific TF binding potential for cell type '+ str(label0)+'...')
         temp=adata_ATAC.X[np.array(label)==label0,:].mean(axis=0).T
         RE=pd.DataFrame(temp,index=adata_ATAC.var['gene_ids'].values,columns=['values'])
         temp=adata_RNA.X[np.array(label)==label0,:].mean(axis=0).T

@@ -123,6 +123,117 @@ set_slurm_job_name() {
     scontrol update JobID="$SLURM_JOB_ID" JobName="LINGER_${SAMPLE_NUM}"
 }
 
+
+check_or_install_tss_locations() {
+    # Checks for the TSS location information for species other than hg38
+    echo "  1) Checking for other species TSS location directory..."
+
+    if [ ! -d "${TSS_MOTIF_INFO_PATH}" ]; then
+        echo "[WARN] TSS location not found at ${TSS_MOTIF_INFO_PATH}"
+        echo "    - Attempting to download and extract..."
+
+        confirm_code=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate \
+            'https://drive.usercontent.google.com/download?id=1Dog5JTS_SNIoa5aohgZmOWXrTUuAKHXV' -O- | \
+            sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p')
+
+        wget --load-cookies /tmp/cookies.txt \
+            "https://drive.usercontent.google.com/download?export=download&confirm=${confirm_code}&id=1Dog5JTS_SNIoa5aohgZmOWXrTUuAKHXV" \
+            -O "${DATA_DIR}/LINGER_OTHER_SPECIES_TF_MOTIF_DATA/provide_data.tar.gz"
+
+        rm -rf /tmp/cookies.txt
+
+        tar -xzf "${DATA_DIR}/LINGER_OTHER_SPECIES_TF_MOTIF_DATA/provide_data.tar.gz" -C "${DATA_DIR}"
+
+        echo "    - Extraction complete."
+    else
+        echo "    - TSS location information exists"
+    fi
+}
+
+
+check_homer() {
+    echo "  2) Checking Homer installation..."
+
+    # Check if 'homer' is installed
+    if ! command -v homer &> /dev/null; then
+        echo "[ERROR] Homer is not installed or not in PATH."
+        echo "    - Installing Homer..."
+        
+        # You can define your install directory here
+        HOMER_INSTALL_DIR="${HOME}/homer"
+
+        mkdir -p "$HOMER_INSTALL_DIR"
+        cd "$HOMER_INSTALL_DIR" || exit 1
+
+        # Download and install Homer
+        wget http://homer.ucsd.edu/homer/configureHomer.pl
+        perl configureHomer.pl -install
+
+        # Add to PATH temporarily (you should add permanently too)
+        export PATH="$HOMER_INSTALL_DIR/bin:$PATH"
+
+        echo "    - Homer installed at $HOMER_INSTALL_DIR"
+    else
+        echo "    - Homer already installed."
+    fi
+
+    HOMER_BIN=$(dirname "$(which homer)")
+    HOMER_BASE=$(realpath "${HOMER_BIN}/..")
+    HOMER_CONFIG="${HOMER_BASE}/share/homer/config.txt"
+
+    # Check if Homer is installed
+    if [ ! -f "$HOMER_CONFIG" ]; then
+        echo "[ERROR] HOMER config.txt not found at $HOMER_CONFIG"
+        echo "Make sure Homer is properly installed."
+        exit 1
+    fi
+
+    # Check if GENOME exists in config.txt
+    if grep -q "${GENOME}" "$HOMER_CONFIG"; then
+        echo "[INFO] Homer genome '${GENOME}' already installed."
+    else
+        echo "[WARN] Homer genome '${GENOME}' not found. Installing..."
+        perl "${HOMER_BASE}/share/homer/configureHomer.pl" -install "${GENOME}" \
+            2> "${LOG_DIR}/${SAMPLE_NUM}/install_homer_species.log"
+        
+        if grep -q "${GENOME}" "$HOMER_CONFIG"; then
+            echo "[INFO] Successfully installed '${GENOME}'."
+        else
+            echo "[ERROR] Failed to install '${GENOME}'. Check log: ${LOG_DIR}/${SAMPLE_NUM}/install_homer_species.log"
+            exit 1
+        fi
+    fi
+
+    # Add homer/bin to PATH if not already
+    if [[ ":$PATH:" != *":${HOMER_BASE}/homer/bin:"* ]]; then
+        echo "[INFO] Adding Homer bin to PATH."
+        export PATH="${PATH}:${HOMER_BASE}/homer/bin"
+    fi
+}
+
+determine_num_cpus() {
+    echo ""
+    echo "[INFO] Checking the number of CPUs available for parallel processing"
+    if [ -z "${SLURM_CPUS_PER_TASK:-}" ]; then
+        if command -v nproc &> /dev/null; then
+            TOTAL_CPUS=$(nproc --all)
+            case $TOTAL_CPUS in
+                [1-15]) IGNORED_CPUS=1 ;;  # Reserve 1 CPU for <=15 cores
+                [16-31]) IGNORED_CPUS=2 ;; # Reserve 2 CPUs for <=31 cores
+                *) IGNORED_CPUS=4 ;;       # Reserve 4 CPUs for >=32 cores
+            esac
+            NUM_CPU=$((TOTAL_CPUS - IGNORED_CPUS))
+            echo "    - Running locally. Detected $TOTAL_CPUS CPUs, reserving $IGNORED_CPUS for system tasks. Using $NUM_CPU CPUs."
+        else
+            NUM_CPU=1  # Fallback
+            echo "    - Running locally. Unable to detect CPUs, defaulting to $NUM_CPU CPU."
+        fi
+    else
+        NUM_CPU=${SLURM_CPUS_PER_TASK}
+        echo "    - Running on SLURM. Number of CPUs allocated: ${NUM_CPU}"
+    fi
+}
+
 # ==========================================
 #             PIPELINE STEPS
 # ==========================================
@@ -147,23 +258,25 @@ run_pipeline() {
     #     --genome "$GENOME" \
     #     --method "$METHOD"
 
-    run_step "Step_020.Linger_Training" "${SCRIPTS_DIR}/Step_020.Linger_Training.py" \
-        --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-        --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "$ORGANISM" \
-        --bulk_model_dir "$BULK_MODEL_DIR" \
-        --genome "$GENOME" \
-        --method "$METHOD" \
-        --activef "$ACTIVEF"
+    # run_step "Step_020.Linger_Training" "${SCRIPTS_DIR}/Step_020.Linger_Training.py" \
+    #     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+    #     --sample_data_dir "$SAMPLE_DATA_DIR" \
+    #     --organism "$ORGANISM" \
+    #     --bulk_model_dir "$BULK_MODEL_DIR" \
+    #     --genome "$GENOME" \
+    #     --method "$METHOD" \
+    #     --activef "$ACTIVEF"
 
-    run_step "Step_030.Create_Cell_Population_GRN" "${SCRIPTS_DIR}/Step_030.Create_Cell_Population_GRN.py" \
-        --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "$ORGANISM" \
-        --genome "$GENOME" \
-        --method "$METHOD" \
-        --activef "$ACTIVEF"
+    # run_step "Step_030.Create_Cell_Population_GRN" "${SCRIPTS_DIR}/Step_030.Create_Cell_Population_GRN.py" \
+    #     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+    #     --sample_data_dir "$SAMPLE_DATA_DIR" \
+    #     --organism "$ORGANISM" \
+    #     --genome "$GENOME" \
+    #     --method "$METHOD" \
+    #     --activef "$ACTIVEF"
 
     run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
+        --tss_motif_info_path "$BULK_MODEL_DIR" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
         --organism "$ORGANISM" \
         --genome "$GENOME" \
@@ -171,12 +284,14 @@ run_pipeline() {
         --celltype "$CELLTYPE"
 
     run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
+        --tss_motif_info_path "$BULK_MODEL_DIR" \
         --sample_data_dir "$SAMPLE_DATA_DIR" \
         --organism "$ORGANISM" \
         --genome "$GENOME" \
         --method "$METHOD" \
         --celltype "$CELLTYPE" \
-        --num_cells 1000
+        --num_cpus $NUM_CPU \
+        --num_cells 10 
 }
 
 # ==========================================
@@ -191,6 +306,15 @@ check_input_files
 activate_conda_env
 setup_directories
 set_slurm_job_name
+determine_num_cpus
+
+if [ "${ORGANISM:-}" != "human" ]; then
+    echo ""
+    echo "[INFO] Organism is not set to 'human'. Checking for Homer installation and TSS location file"
+    check_or_install_tss_locations
+    check_homer
+fi
+
 echo ""
 echo "===== CHECKS COMPLETE: STARTING MAIN PIPELINE ====="
 run_pipeline

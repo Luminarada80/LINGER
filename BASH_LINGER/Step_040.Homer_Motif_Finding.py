@@ -4,6 +4,18 @@ import sys
 import argparse
 import os
 import logging
+import shutil
+
+# Find HOMER binary path dynamically
+homer_bin = shutil.which("findMotifsGenome.pl")
+if homer_bin is None:
+    raise RuntimeError("Cannot find findMotifsGenome.pl in PATH. Please load HOMER correctly.")
+
+# HOMER base directory (one level up from bin/)
+homer_base = os.path.abspath(os.path.join(os.path.dirname(homer_bin), ".."))
+
+# Path to genomes folder inside HOMER
+genome_folder = os.path.join(homer_base, "data", "genomes")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')

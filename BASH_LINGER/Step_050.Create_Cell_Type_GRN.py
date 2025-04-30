@@ -73,27 +73,27 @@ elif args.organism.lower() == "human":
 
   output_dir = args.sample_data_dir + "/"
 
-  # logging.info(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"')
-  # LL_net.cell_type_specific_TF_RE_binding(
-  #   args.tss_motif_info_path,
-  #   adata_RNA,
-  #   adata_ATAC,
-  #   args.genome,
-  #   args.celltype,
-  #   output_dir,
-  #   args.method
-  #   )
+  logging.info(f'Calculating cell-type specific TF RE binding for celltype "{args.celltype}"')
+  LL_net.cell_type_specific_TF_RE_binding(
+    args.tss_motif_info_path,
+    adata_RNA,
+    adata_ATAC,
+    args.genome,
+    args.celltype,
+    output_dir,
+    args.method
+    )
 
-  # logging.info(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"')
-  # LL_net.cell_type_specific_cis_reg(
-  #   args.tss_motif_info_path,
-  #   adata_RNA,
-  #   adata_ATAC,
-  #   args.genome,
-  #   args.celltype,
-  #   output_dir,
-  #   args.method
-  #   )
+  logging.info(f'Calculating cell-type specific cis-regulatory network for celltype "{args.celltype}"')
+  LL_net.cell_type_specific_cis_reg(
+    args.tss_motif_info_path,
+    adata_RNA,
+    adata_ATAC,
+    args.genome,
+    args.celltype,
+    output_dir,
+    args.method
+    )
 
   logging.info(f'Calculating cell-type specific trans-regulatory network for celltype "{args.celltype}"')
   LL_net.cell_type_specific_trans_reg(
