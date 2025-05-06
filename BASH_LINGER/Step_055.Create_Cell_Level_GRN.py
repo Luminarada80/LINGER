@@ -1,18 +1,17 @@
 import scanpy as sc
 import multiprocessing
-import subprocess
-import pandas as pd
-import sys
+from tqdm import tqdm
+import logging, sys, os
 import argparse
-import os
 import random
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 # Import the project directory to load the linger module
 sys.path.insert(0, '/gpfs/Labs/Uzun/SCRIPTS/PROJECTS/2024.GRN_BENCHMARKING.MOELLER/LINGER')
+
+import linger.LL_net as LL_net
 
 parser = argparse.ArgumentParser(description="Train the scNN neural network model.")
 
@@ -26,57 +25,59 @@ parser.add_argument("--organism", required=True, help='Enter "mouse" or "human"'
 parser.add_argument("--num_cpus", required=True, help='Number of cpus allocated for the job')
 parser.add_argument("--num_cells", required=True, help='Number of cells to generate GRNs for')
 
-
 args = parser.parse_args()
 
-def calculate_cell_level_TF_RE_in_parallel(cell_names_slice, adata_RNA, adata_ATAC, genome, output_dir, method, tss_motif_info_path):
-    """
-    Function to process a slice of cells in parallel.
-    """
-    
-    # Call the function to process a subset of cells
-    LL_net.cell_level_TF_RE_binding(
-        tss_motif_info_path,
-        adata_RNA,
-        adata_ATAC,
-        genome,
-        cell_names_slice,
-        output_dir,
-        method
-    )
+def _init_worker(rna, atac, genome, method, tss_info, out_dir, tf_binding):
+    global _adata_RNA, _adata_ATAC, _genome, _method, _tss_info, _out_dir, _tf_binding
+    _adata_RNA  = rna
+    _adata_ATAC = atac
+    _genome     = genome
+    _method     = method
+    _tss_info   = tss_info
+    _out_dir    = out_dir
+    _tf_binding = tf_binding
 
-def calculate_cell_level_cis_reg_in_parallel(cell_names_slice, adata_RNA, adata_ATAC, genome, output_dir, method, tss_motif_info_path):
-    """
-    Function to process a slice of cells in parallel.
-    """
-    
-    LL_net.cell_level_cis_reg(
-      tss_motif_info_path,
-      adata_RNA,
-      adata_ATAC,
-      genome,
-      cell_names_slice,
-      output_dir,
-      method
-      )
-    
-def calculate_cell_level_trans_reg_in_parallel(cell_names_slice, output_dir):
-    """
-    Function to process a slice of cells in parallel.
-    """
-    
-    LL_net.cell_level_trans_reg(
-      cell_names_slice,
-      output_dir,
-      )
+def _process_chunk(chunk):
+    try:
+        try:
+            # TF-RE binding
+            LL_net.cell_level_TF_RE_binding(
+                _tss_info, _adata_RNA, _adata_ATAC, _genome,
+                chunk, _out_dir, _method, _tf_binding
+            )
+        except Exception as e:
+            logging.error(f'Cell level TF-RE binding failed for cells {chunk}: {e}')
+        
+        try:
+            # cis‑reg
+            LL_net.cell_level_cis_reg(
+                _tss_info, _adata_RNA, _adata_ATAC, _genome,
+                chunk, _out_dir, _method
+            )
+        except Exception as e:
+            logging.error(f'Cell level cis-reg binding failed for cells {chunk}: {e}')
+        
+        try:
+            # trans‑reg
+            LL_net.cell_level_trans_reg(chunk, _out_dir)
+        except Exception as e:
+            logging.error(f'Cell level trans-reg binding failed for cells {chunk}: {e}')
+        
+        return len(chunk)  # or anything you like
+    except Exception as e:
+        logging.error(f"chunk {chunk} crashed: {e}")
+    return len(chunk)
 
-import linger.LL_net as LL_net
 # Load in the adata_RNA and adata_ATAC files
 logging.info(f'Reading in the RNAseq and ATACseq h5ad adata')
 adata_RNA = sc.read_h5ad(f'{args.sample_data_dir}/adata_RNA.h5ad')
 adata_ATAC = sc.read_h5ad(f'{args.sample_data_dir}/adata_ATAC.h5ad')
 
 output_dir = args.sample_data_dir
+
+cell_outdir = os.path.join(output_dir, "CELL_SPECIFIC_GRNS")
+if not os.path.exists(cell_outdir):
+    os.makedirs(cell_outdir)
 
 logging.info(f'Calculating cell level GRNs for celltype "{args.celltype}"')
 
@@ -92,25 +93,25 @@ cell_name_chunks = [cell_names[i:i + chunk_size] for i in range(0, len(cell_name
 
 num_cpus = int(args.num_cpus)
 
-# Uses multiprocessing Pool to process each chunk of cells in parallel
-logging.info(f'\t- {num_cpus} CPUs detected')
+if args.genome == "mm10":
+    TFbinding = LL_net.load_TFbinding_scNN(args.tss_motif_info_path, output_dir, args.genome)
+else:
+    TFbinding = None
 
-# Calculate the cell-level TF-RE binding potential network
-logging.info(f'\n  1) Calculating cell-level TF-RE binding potential network')
-with multiprocessing.Pool(processes=num_cpus) as pool:
-    pool.starmap(calculate_cell_level_TF_RE_in_parallel, 
-                [(chunk, adata_RNA, adata_ATAC, args.genome, output_dir, args.method, args.tss_motif_info_path) for chunk in cell_name_chunks])
+logging.info(f"\nLaunching processing on {num_cpus} workers…")
+with multiprocessing.Pool(
+    processes=num_cpus,
+    initializer=_init_worker,
+    initargs=(adata_RNA, adata_ATAC, args.genome,
+                args.method, args.tss_motif_info_path,
+                args.sample_data_dir, TFbinding)
+) as pool:
+    for processed in tqdm(
+        pool.imap_unordered(_process_chunk, cell_names),
+        total=len(cell_names),
+        desc="Cells",
+        unit="cell"
+    ):
+        logging.info(f"  • Finished chunk of {processed} cells")
 
-# Calculate the cell-level cis-regualtory binding potential network
-logging.info(f'\n  2) Calculating cell-level cis-regulatory binding potential network')
-with multiprocessing.Pool(processes=num_cpus) as pool:
-    pool.starmap(calculate_cell_level_cis_reg_in_parallel, 
-                [(chunk, adata_RNA, adata_ATAC, args.genome, output_dir, args.method, args.tss_motif_info_path) for chunk in cell_name_chunks])
-
-# Calculate the cell-level trans-regulatory binding potential network
-logging.info(f'\n  3)Calculating cell-level trans-regulatory binding potential network')
-with multiprocessing.Pool(processes=num_cpus) as pool:
-    pool.starmap(calculate_cell_level_trans_reg_in_parallel, 
-                [(chunk, output_dir) for chunk in cell_name_chunks])
-
-logging.info("Done!")
+logging.info("All chunks complete")

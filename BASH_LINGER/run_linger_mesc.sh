@@ -2,8 +2,8 @@
 
 #SBATCH -p compute
 #SBATCH --nodes=1
-#SBATCH -c 16
-#SBATCH --mem 64G
+#SBATCH -c 32
+#SBATCH --mem 128G
 
 set -euo pipefail
 
@@ -284,10 +284,10 @@ run_pipeline() {
 #     --activef "$ACTIVEF" \
 #     --organism "$ORGANISM" 
 
-  run_step "Step_040.Homer_Motif_Finding" "${SCRIPTS_DIR}/Step_040.Homer_Motif_Finding.py" \
-    --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
-    --sample_data_dir "$SAMPLE_DATA_DIR" \
-    --genome "$GENOME"
+#   run_step "Step_040.Homer_Motif_Finding" "${SCRIPTS_DIR}/Step_040.Homer_Motif_Finding.py" \
+#     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
+#     --sample_data_dir "$SAMPLE_DATA_DIR" \
+#     --genome "$GENOME"
 
 #   run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
 #     --tss_motif_info_path "$TSS_MOTIF_INFO_PATH" \
@@ -305,7 +305,7 @@ run_pipeline() {
     --celltype "$CELLTYPE" \
     --organism "$ORGANISM" \
     --num_cpus $NUM_CPU \
-    --num_cells 10
+    --num_cells 100
 }
 
 # ==========================================

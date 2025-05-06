@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, coo_matrix, csc_matrix
-from tqdm import tqdm
 import torch
 import csv
 import torch.nn as nn
@@ -1263,6 +1262,107 @@ def cell_type_specific_TF_RE_binding(
         result.to_csv(os.path.join(outdir, f'cell_type_specific_TF_RE_binding_{str(label0)}.txt'), sep='\t')
 
 
+def cell_level_TF_RE_binding_chr_scNN(
+    scRNA_data,  # AnnData object representing scRNA-seq data
+    scATAC_data,  # AnnData object representing scATAC-seq data
+    grn_directory: str,  # Path to the directory containing gene regulatory network data
+    chromosome_number: str,  # Chromosome number (e.g., 'chr1')
+    genome_version: str,  # Genome version (e.g., 'hg38')
+    cell_name: str,  # Specific cell name to compute TF binding for
+    output_directory: str,  # Output directory path
+    TFbinding: pd.DataFrame
+) -> pd.DataFrame:
+    # Extract cell names and check if the specified cell exists
+    cell_names = scRNA_data.obs_names  # Assuming the cell names are stored as obs_names in the AnnData object
+    if cell_name not in cell_names:
+        raise ValueError(f'Cell name "{cell_name}" not found in the dataset.')
+    
+    logging.debug(f'\t\t - Loading {chromosome_number}_cell_population_TF_RE_binding.txt')
+    A = pd.read_csv(os.path.join(output_directory, f'{chromosome_number}_cell_population_TF_RE_binding.txt'), sep='\t', header=0, index_col=0)
+    
+    logging.debug(f'\t\t - Converting TF RE DataFrame to dense matrix')
+    mat, REs, TFs = list2mat(A, 'RE', 'TF', 'score')
+    mat = pd.DataFrame(mat, index=REs, columns=TFs)
+
+    # Get the index of the specific cell in the scRNA adata
+    cell_index = list(cell_names).index(cell_name)
+
+    logging.debug(f'\t\t - Computing the RE accessibility for the cell')
+    # Compute the accessibility of regulatory elements (REs) for the specific cell
+    atac_cell_data = scATAC_data.X[cell_index, :].toarray().reshape(-1, 1) # convert to an array from a coomatrix and reshape columns and rows
+    regulatory_element_accessibility = pd.DataFrame(atac_cell_data, index=scATAC_data.var['gene_ids'].values, columns=['values'])
+
+    logging.debug(f'\t\t - Computing the gene expression for the cell')
+    # Compute the gene expression (TG) for the specific cell
+    rna_cell_data = scRNA_data.X[cell_index, :].toarray().reshape(-1, 1)  # RNA-seq data for the specific cell
+    target_gene_expression = pd.DataFrame(rna_cell_data, index=scRNA_data.var['gene_ids'].values, columns=['values'])
+    
+    # Get a list of the potential TGs (gene names from the scRNA_data)
+    TGs = pd.DataFrame([], index=scRNA_data.var['gene_ids'].values)
+    
+    TFs = TFbinding.columns
+    
+    # Get a list of the TFs that overlap with the list of TGs
+    logging.debug(f'\t\t - Finding overlap between TFs, TGs, TFbinding, REoverlap, and mat')
+    TFoverlap = list(set(TFs) & set(TGs.index))
+    
+    # matrix of TF
+    mat = mat[TFoverlap]
+    
+    TFbinding = TFbinding[TFoverlap]
+    
+    REoverlap=list(set(TFbinding.index)&set(mat.index))
+    
+    TFbinding=TFbinding.loc[REoverlap]
+    
+    logging.debug(f'\t\t - Setting up a new matrix for the overlapping TF binding')
+    TFbinding1=np.zeros((mat.shape[0],len(TFoverlap)))
+    
+    REidx=pd.DataFrame(range(mat.shape[0]),index=mat.index)
+    
+    TFbinding1[REidx.loc[TFbinding.index][0].values,:]=TFbinding.values
+    
+    TFbinding1 = pd.DataFrame(TFbinding1,index=mat.index,columns=TFoverlap)
+    
+    
+    logging.debug(f'\t\t - Finding RE accessibility for the TF-RE REs')
+    RE = regulatory_element_accessibility.loc[REs]
+    
+    logging.debug(f'\t\t - Finding TF expressionf or the relevant TFs')
+    TF = target_gene_expression.loc[TFoverlap]
+    
+    logging.debug(f'\t\t - Normalizing TFbindng by the mean TF expression')
+    mat_m=np.mean(mat.values[mat>0])
+    
+    mat = mat / mat_m
+    
+    mat.values[mat.values<0]=0
+    
+    TFbinding = TFbinding / TFbinding.mean(axis=1).mean()
+    
+    TF_cluster = TF.values
+    
+    TF_cluster=TF_cluster/TF_cluster.mean()
+    
+    RE_cluster = RE.values
+    
+    RE_cluster=RE_cluster/RE_cluster.mean()
+    
+    binding_strength = (np.log(RE_cluster+0.1) + np.log(mat+TFbinding+0.1)).T + np.log(TF_cluster+0.1)
+    
+    binding_strength = np.exp(binding_strength.T)
+    
+    binding_strength.index = mat.index
+
+    # Group the binding matrix by regulatory elements and take the maximum binding score for each group
+    max_binding_scores = binding_strength.groupby(binding_strength.index).max()
+    
+    # Ensure that the gene names (transcription factors) remain as columns
+    max_binding_scores.columns = TFoverlap  # Explicitly set column names to the overlapping TFs
+    
+    return max_binding_scores
+    
+
 def cell_level_TF_RE_binding_chr(
     scRNA_data,  # AnnData object representing scRNA-seq data
     scATAC_data,  # AnnData object representing scATAC-seq data
@@ -1307,11 +1407,8 @@ def cell_level_TF_RE_binding_chr(
     if cell_name not in cell_names:
         raise ValueError(f'Cell name "{cell_name}" not found in the dataset.')
 
-    # Get the index of the specific cell
+    # Get the index of the specific cell in the scRNA adata
     cell_index = list(cell_names).index(cell_name)
-
-    # Load regions and their overlap information from the gene regulatory network data
-    region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
 
     # Compute the accessibility of regulatory elements (REs) for the specific cell
     atac_cell_data = scATAC_data.X[cell_index, :].toarray().reshape(-1, 1) # convert to an array from a coomatrix and reshape columns and rows
@@ -1324,10 +1421,13 @@ def cell_level_TF_RE_binding_chr(
     # Extract the overlapped peaks from the regulatory element DataFrame
     regulatory_element_accessibility = regulatory_element_accessibility.loc[region_names_overlap]
 
-    # Load TF binding data for the given chromosome
-    tf_binding_data = load_TFbinding(grn_directory, region_overlap, unique_overlap, hg19_unique_overlap, chromosome_number)
-
     if method == 'LINGER':
+        # Load regions and their overlap information from the gene regulatory network data
+        region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
+
+        # Load TF binding data for the given chromosome
+        tf_binding_data = load_TFbinding(grn_directory, region_overlap, unique_overlap, hg19_unique_overlap, chromosome_number)
+        
         # Handle missing regions in the LINGER binding matrix
         missing_regions = list(set(region_names_overlap) - set(tf_re_binding_matrix.index))
         if missing_regions:
@@ -1339,6 +1439,12 @@ def cell_level_TF_RE_binding_chr(
         tf_re_binding_matrix = tf_re_binding_matrix.loc[region_names_overlap]
 
     if method == 'baseline':
+        # Load regions and their overlap information from the gene regulatory network data
+        region_overlap, region_names_overlap, unique_overlap, unique_region_names_overlap, hg19_unique_overlap = load_region(grn_directory, genome_version, chromosome_number, output_directory)
+
+        # Load TF binding data for the given chromosome
+        tf_binding_data = load_TFbinding(grn_directory, region_overlap, unique_overlap, hg19_unique_overlap, chromosome_number)
+        
         # Load the TF-RE binding matrix for the current chromosome
         tf_re_binding_matrix = load_TF_RE(grn_directory, chromosome_number, region_overlap, unique_overlap, hg19_unique_overlap)
         tf_re_binding_matrix.index = region_names_overlap
@@ -1379,21 +1485,8 @@ def cell_level_TF_RE_binding_chr(
     # Group the binding matrix by regulatory elements and take the maximum binding score for each group
     max_binding_scores = binding_strength.groupby(binding_strength.index).max()
     
-    # # Ensure max_binding_scores has the same length as region_names_overlap (no columns should be added back)
-    # max_binding_scores = max_binding_scores.loc[region_names_overlap]
-
-    # # Convert dictionary to DataFrame and transpose it to have cells as rows, REs as columns
-    # result = pd.DataFrame(max_binding_scores).T  # Transpose to have cells as rows, REs as columns
-    
-    # # Ensure unique indices before concatenation
-    # result = result.reset_index(drop=True, inplace=True)  # Reset index if necessary
-    # logging.info(result.head())
-    # logging.info(result.shape)
-    
     # Ensure that the gene names (transcription factors) remain as columns
     max_binding_scores.columns = overlapping_tfs  # Explicitly set column names to the overlapping TFs
-
-    
 
     return max_binding_scores
 
@@ -1404,7 +1497,8 @@ def cell_level_TF_RE_binding(
     genome: str, 
     cells: List[str],
     outdir: str, 
-    method: str
+    method: str,
+    TFbinding = None
 ) -> None:
     """
     Generates TF binding potentials for regulatory elements (RE) for specific cells
@@ -1413,59 +1507,57 @@ def cell_level_TF_RE_binding(
     cell_names = adata_RNA.obs_names.tolist()
     if not set(cells).issubset(cell_names):
         raise ValueError(f"Some specified cells are not present in the dataset.")
-
+    
+    result = pd.DataFrame()
     for cell_name in cells:
-        logging.info(f"\t  - Processing cell {cell_name}")
-        result = pd.DataFrame()
-
-        if genome in ("hg38", "hg19"):
-            chroms = [f"chr{i+1}" for i in range(22)] + ["chrX"]
-            for chrN in chroms:
-                mat_path = os.path.join(outdir, f"{chrN}_cell_population_TF_RE_binding.txt")
-                mat = pd.read_csv(mat_path, sep='\t', index_col=0, header=0)
-                out = cell_level_TF_RE_binding_chr(
-                    adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat
-                )
-                result = pd.concat([result, out], join='outer', axis=0)
-
-        elif genome == "mm10":
-            # Load merged TF-RE binding matrix
-            mat_path = os.path.join(outdir, "cell_population_TF_RE_binding.txt")
-            mat = pd.read_csv(mat_path, sep='\t', index_col=0, header=0)
-            TFs = mat.columns
-            REs = mat.index
-            TFbinding = load_TFbinding_scNN(GRNdir, outdir, genome)
-
-            RE = pd.DataFrame(
-                adata_ATAC[cell_name].X.toarray().reshape(-1, 1),
-                index=adata_ATAC.var['gene_ids'].values,
-                columns=['values']
-            ).loc[REs]
-
-            TG = pd.DataFrame(
-                adata_RNA[cell_name].X.toarray().reshape(-1, 1),
-                index=adata_RNA.var['gene_ids'].values,
-                columns=['values']
-            )
-
-            TFoverlap = list(set(TFs) & set(TG.index) & set(TFbinding.columns))
-            mat = mat[TFoverlap]
-            TFbinding = TFbinding[TFoverlap]
-
-            REoverlap = list(set(TFbinding.index) & set(RE.index))
-            TFbinding1 = np.zeros((mat.shape[0], len(TFoverlap)))
-            REidx = pd.DataFrame(range(mat.shape[0]), index=mat.index)
-            TFbinding1[REidx.loc[REoverlap][0].values, :] = TFbinding.loc[REoverlap].values
-            TFbinding1 = pd.DataFrame(TFbinding1, index=mat.index, columns=TFoverlap)
-
-            result = cell_type_specific_TF_RE_binding_score_scNN(
-                mat, TFbinding1, RE, TG, TFoverlap
-            )
 
         cell_outdir = os.path.join(outdir, 'CELL_SPECIFIC_GRNS', f'cell_{cell_name}')
         os.makedirs(cell_outdir, exist_ok=True)
-        result.to_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
         
+        # Skip if the TF-RE binding score file already exists for the current cell
+        if "cell_specific_TF_RE_binding.txt" in os.listdir(cell_outdir):
+            continue
+        
+        else:
+        
+            if genome in ("hg38", "hg19"):
+                
+                logging.debug(f"\t  - Processing cell {cell_name}")
+                chroms = [f"chr{i+1}" for i in range(22)] + ["chrX"]
+                for chrN in chroms:
+                    mat_path = os.path.join(outdir, f"{chrN}_cell_population_TF_RE_binding.txt")
+                    mat = pd.read_csv(mat_path, sep='\t', index_col=0, header=0)
+                    out = cell_level_TF_RE_binding_chr(
+                        adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, method, mat
+                    )
+                    result = pd.concat([result, out], join='outer', axis=0)
+                
+                result.to_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
+
+            
+            elif genome == "mm10":
+                
+                logging.debug(f"Processing cell {cell_name}")
+                chroms = [f"chr{i+1}" for i in range(19)] + ["chrX"]
+                        
+                for chrN in chroms:
+                    logging.debug(f' - Processing {chrN}')
+                    out = cell_level_TF_RE_binding_chr_scNN(
+                        adata_RNA, adata_ATAC, GRNdir, chrN, genome, cell_name, outdir, TFbinding
+                    )
+                    
+                    logging.debug(f"\t - Calculating cell-level TF-RE binding")
+                    result = pd.concat([result, out], join='outer', axis=0)
+                    logging.debug("\t   - Done!")
+                
+                result.to_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index=True, header=True)
+                
+        else:
+            logging.error(f"ERROR: Genome {genome} not available")
+        
+
+    
+    
 def load_shapley(chr: str, data_dir: str, outdir: str):
     """
     Loads the Shapley values for the specified chromosome, along with relevant gene, TF, and RE data.
@@ -2347,42 +2439,68 @@ def cell_level_cis_reg(
             The function saves the cis-regulatory results to a text file for each individual cell.
     """
 
-    chrom = ['chr' + str(i + 1) for i in range(22)] + ['chrX']
+    
 
     for cell_name in cell_names:
-        logging.info(f"\t  - Processing cell {cell_name}")
-
-        result = pd.DataFrame([])
-
-        if genome in ("hg19", "hg38"):
-            for chrN in chrom:
-                temp = cell_level_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir)
-                result = pd.concat([result, temp], axis=0, join='outer')
-
-        elif genome == "mm10":
-            label = adata_RNA.obs['label'].values
-            cell_mask = (label == cell_name)
-            if not np.any(cell_mask):
-                logging.warning(f"Cell label {cell_name} not found in adata_RNA.obs['label']. Skipping.")
-                continue
-
-            RE_mean = adata_ATAC.X[cell_mask, :].mean(axis=0).T
-            TG_mean = adata_RNA.X[cell_mask, :].mean(axis=0).T
-            RE = pd.DataFrame(RE_mean, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
-            TG = pd.DataFrame(TG_mean, index=adata_RNA.var['gene_ids'].values, columns=['values'])
-
-            # Load preprocessed cisGRN and metadata
-            distance,cisGRN,REs,TGs=load_RE_TG_scNN(outdir)
-
-            result = cell_type_specific_cis_reg_scNN(distance, cisGRN, RE, TG, REs, TGs)
-
-        else:
-            raise ValueError(f"Unsupported genome: {genome}")
-
+        logging.debug(f"\t  - Processing cell {cell_name}")
+        
         cell_outdir = os.path.join(outdir, 'CELL_SPECIFIC_GRNS', f'cell_{cell_name}/')
         os.makedirs(cell_outdir, exist_ok=True)
+        
+        # Skip processing the cell if the cis-regualtory binding potential file exists
+        if 'cell_specific_cis_regulatory.txt' in os.listdir(cell_outdir):
+            continue
+        
+        else:
+            result = pd.DataFrame([])
 
-        result.to_csv(os.path.join(cell_outdir, 'cell_specific_cis_regulatory.txt'), sep='\t', header=None, index=None)
+            if genome in ("hg19", "hg38"):
+                
+                chrom = ['chr' + str(i + 1) for i in range(22)] + ['chrX']
+                for chrN in chrom:
+                    temp = cell_level_cis_reg_chr(GRNdir, adata_RNA, adata_ATAC, genome, chrN, cell_name, outdir)
+                    result = pd.concat([result, temp], axis=0, join='outer')
+                    
+                result.to_csv(os.path.join(cell_outdir, 'cell_specific_cis_regulatory.txt'), sep='\t', header=None, index=None)
+
+            elif genome == "mm10":
+                
+                # Find the entry for the current cell in the atac_RNA dataset
+                rna_cell_names = adata_RNA.obs_names
+                if cell_name not in rna_cell_names:
+                    raise ValueError(f'Cell name "{cell_name}" not found in the dataset.')
+                
+                # Get the index of the specific cell in the scRNA adata
+                cell_index = list(rna_cell_names).index(cell_name)
+
+                logging.debug(f'\t\t - Computing the RE accessibility for the cell')
+                # Compute the accessibility of regulatory elements (REs) for the specific cell
+                atac_cell_data = adata_ATAC.X[cell_index, :].toarray().reshape(-1, 1) # convert to an array from a coomatrix and reshape columns and rows
+                regulatory_element_accessibility = pd.DataFrame(atac_cell_data, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
+
+                logging.debug(f'\t\t - Computing the gene expression for the cell')
+                # Compute the gene expression (TG) for the specific cell
+                rna_cell_data = adata_RNA.X[cell_index, :].toarray().reshape(-1, 1)  # RNA-seq data for the specific cell
+                target_gene_expression = pd.DataFrame(rna_cell_data, index=adata_RNA.var['gene_ids'].values, columns=['values'])
+                
+                # Get a list of the potential TGs (gene names from the scRNA_data)
+
+                RE = pd.DataFrame(regulatory_element_accessibility, index=adata_ATAC.var['gene_ids'].values, columns=['values'])
+                TG = pd.DataFrame(target_gene_expression, index=adata_RNA.var['gene_ids'].values, columns=['values'])
+
+                # Load preprocessed cisGRN and metadata
+                distance,cisGRN,REs,TGs = load_RE_TG_scNN(outdir)
+
+                result = cell_type_specific_cis_reg_scNN(distance, cisGRN, RE, TG, REs, TGs)
+                
+                result.to_csv(os.path.join(cell_outdir, 'cell_specific_cis_regulatory.txt'), sep='\t', header=None, index=None)
+
+            else:
+                raise ValueError(f"Unsupported genome: {genome}")
+
+
+
+        
 
 
 def cell_type_specific_cis_reg_scNN(
@@ -3104,30 +3222,33 @@ def cell_level_trans_reg(
             The function saves the trans-regulatory network to a text file for each cell type or the selected cell type.
     """
     for cell_name in cell_names:  # Iterate over all cell types
-        logging.info(f'\t  - Processing cell {cell_name}')
         # Create directory for the current cell if it does not exist
         cell_outdir = os.path.join(outdir, 'CELL_SPECIFIC_GRNS', f'cell_{cell_name}/')
-        if not os.path.exists(cell_outdir):
-            os.makedirs(cell_outdir)
-            
-        # Load cell-type-specific TF-RE binding data for the current cell type
-        Binding = pd.read_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index_col=0)
+        os.makedirs(cell_outdir, exist_ok=True)
+        
+        # Skip processing this cell if the trans-regulatory binding file already exists
+        if 'cell_specific_TF_RE_binding.txt' in os.listdir(cell_outdir):
+            continue
+        
+        else:
+            # Load cell-type-specific TF-RE binding data for the current cell type
+            Binding = pd.read_csv(os.path.join(cell_outdir, 'cell_specific_TF_RE_binding.txt'), sep='\t', index_col=0, on_bad_lines='skip')
 
-        # Load the cis-regulatory network for the current cell type
-        cis = load_cell_specific_cis(Binding, cell_outdir)
+            # Load the cis-regulatory network for the current cell type
+            cis = load_cell_specific_cis(Binding, cell_outdir)
 
-        # Get the sets of transcription factors (TFs) and target genes (TGs)
-        TFset = Binding.columns
-        TGset = cis.columns
+            # Get the sets of transcription factors (TFs) and target genes (TGs)
+            TFset = Binding.columns
+            TGset = cis.columns
 
-        # Calculate the trans-regulatory network using matrix multiplication
-        S = np.matmul(Binding.values.T, cis.values).T  # TF-RE binding and cis-regulatory interactions
+            # Calculate the trans-regulatory network using matrix multiplication
+            S = np.matmul(Binding.values.T, cis.values).T  # TF-RE binding and cis-regulatory interactions
 
-        # Convert the resulting matrix into a DataFrame
-        S = pd.DataFrame(S, index=TGset, columns=TFset)
+            # Convert the resulting matrix into a DataFrame
+            S = pd.DataFrame(S, index=TGset, columns=TFset)
 
-        # Save the trans-regulatory network for the current cell type to a file
-        S.to_csv(os.path.join(cell_outdir, 'cell_specific_trans_regulatory.txt'), sep='\t')
+            # Save the trans-regulatory network for the current cell type to a file
+            S.to_csv(os.path.join(cell_outdir, 'cell_specific_trans_regulatory.txt'), sep='\t')
 
 def TF_RE_scNN(
     TFName: np.ndarray, 
@@ -3341,21 +3462,29 @@ def load_TFbinding_scNN(
     """
 
     # Load genome mapping file to map genome identifiers to species (e.g., Ensembl species name)
+    logging.debug(f' - Loading Homer genome map')
     genome_map = pd.read_csv(os.path.join(GRNdir, 'genome_map_homer.txt'), sep='\t', header=0)
     genome_map.index = genome_map['genome_short'].values  # Set genome_short as the index for easy lookup
+    logging.debug(f'\t Done!')
 
     # Load motif binding data from the 'MotifTarget.bed' file
+    logging.debug(f' - Loading MotifTarget.bed file')
     A = pd.read_csv(os.path.join(outdir, 'MotifTarget.bed'), sep='\t', header=0, index_col=None)
+    logging.debug(f'\t Done!')
 
     # Apply logarithmic transformation to the MotifScore column for normalization
     A['MotifScore'] = np.log(1 + A['MotifScore'])
 
     # Load motif-TF matching data for the selected genome
+    logging.debug(f' - Loading Match_TF_motif_{genome_map.loc[genome]["species_ensembl"]}.txt')
     Match2 = pd.read_csv(os.path.join(GRNdir, f'Match_TF_motif_{genome_map.loc[genome]["species_ensembl"]}.txt'), sep='\t', header=0)
+    logging.debug(f'\t Done!')
 
     # Convert the motif binding data into a matrix where rows are REs, columns are motifs, and values are motif scores
     # The 'list2mat' function creates a matrix where 'PositionID' is used for REs, 'Motif Name' for motifs, and 'MotifScore' for the values
+    logging.debug(f' - Converting the MotifTarget.bed DataFrame to dense matrix')
     TF_binding, REs1, motifs = list2mat(A, 'PositionID', 'Motif Name', 'MotifScore')
+    logging.debug(f'\t Done!')
 
     # Convert the TF_binding matrix to a DataFrame with motif names as the row index and RE names as the column index
     TF_binding1 = pd.DataFrame(TF_binding.T, index=motifs, columns=REs1)

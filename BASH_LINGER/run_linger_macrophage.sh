@@ -275,13 +275,13 @@ run_pipeline() {
     #     --method "$METHOD" \
     #     --activef "$ACTIVEF"
 
-    run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
-        --tss_motif_info_path "$BULK_MODEL_DIR" \
-        --sample_data_dir "$SAMPLE_DATA_DIR" \
-        --organism "$ORGANISM" \
-        --genome "$GENOME" \
-        --method "$METHOD" \
-        --celltype "$CELLTYPE"
+    # run_step "Step_050.Create_Cell_Type_GRN" "${SCRIPTS_DIR}/Step_050.Create_Cell_Type_GRN.py" \
+    #     --tss_motif_info_path "$BULK_MODEL_DIR" \
+    #     --sample_data_dir "$SAMPLE_DATA_DIR" \
+    #     --organism "$ORGANISM" \
+    #     --genome "$GENOME" \
+    #     --method "$METHOD" \
+    #     --celltype "$CELLTYPE"
 
     run_step "Step_055.Create_Cell_Level_GRN" "${SCRIPTS_DIR}/Step_055.Create_Cell_Level_GRN.py" \
         --tss_motif_info_path "$BULK_MODEL_DIR" \
@@ -291,7 +291,7 @@ run_pipeline() {
         --method "$METHOD" \
         --celltype "$CELLTYPE" \
         --num_cpus $NUM_CPU \
-        --num_cells 10 
+        --num_cells 1000 
 }
 
 # ==========================================
